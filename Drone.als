@@ -45,6 +45,7 @@ fact {
 	all e:EnsembleProduits | some c:Commande | c.ensembleProd = e //ensemble de Produit appartient à une commande
 	all c:Commande | some e:Entrepot | c in e.ensembleCommandes //Les commandes sont dans l'entrepôt
 	all e:EnsembleProduits | some dcap:Drone.DCAP | e.capacite <= dcap //La capacité d'une commande est restreinte
+	all c:Commande | one c.ensembleProd => c.destination.position != Entrepot.position //Pas de commande livrée à l'entrepot
 
 	//A améliorer
 	all d:Drone | d.DCAP > 0 //implicite

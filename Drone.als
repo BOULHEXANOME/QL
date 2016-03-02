@@ -1,5 +1,5 @@
 open util/integer
-//open DroneXY
+
 
 /***************************************
 										Sig
@@ -40,30 +40,6 @@ sig Intersection {
 
 
 /***************************************
-										Pred
-***************************************/
-
-pred init {
-	all d:Drone | d.Batterie = 3
-}
- 
-pred depotCmd {
-	all d:Drone |
-    (one d.commande  && d.commande.destination.position = d.position) =>
-	no d.commande
-}
-
-pred JeVeuxAllerACeReceptacle[r1:Receptacle, objectifFinal:Receptacle] {
-	distanceOk[r1, objectifFinal]||some r3 :Receptacle | distanceOk[r1,r3] && JeVeuxAllerACeReceptacle[r3,objectifFinal]&&r3!=r1
-}
-
-pred distanceOk[r1:Receptacle, r2:Receptacle]{
-	//abs[r1.position.X-r2.position.X] + abs[r1.position.Y-r2.position.Y] <=3
-}
-
-
-
-/***************************************
 										Fact
 ***************************************/
 
@@ -96,18 +72,41 @@ fact IntersectionUnitaire {
 	not (i1.X=i2.X && i1.Y=i2.Y)
 }
 
+
+//fact : restreindre commande avec ensembleProduit
+//fact : capacité d'un receptacle ne doit pas être trop faible, capacite de l'ensemble pas trop importante
+
+
+/***************************************
+										Pred
+***************************************/
+
+pred init {
+	all d:Drone | d.Batterie = 3
+}
+ 
+pred depotCmd {
+	all d:Drone |
+    (one d.commande  && d.commande.destination.position = d.position) =>
+	no d.commande
+}
+
+pred JeVeuxAllerACeReceptacle[r1:Receptacle, objectifFinal:Receptacle] {
+	distanceOk[r1, objectifFinal]||some r3 :Receptacle | distanceOk[r1,r3] && JeVeuxAllerACeReceptacle[r3,objectifFinal]&&r3!=r1
+}
+
+pred distanceOk[r1:Receptacle, r2:Receptacle]{
+	abs[r1.position.X-r2.position.X] + abs[r1.position.Y-r2.position.Y] <=3
+}
+
 /***************************************
 										Fun
 ***************************************/
 
-// TODO 
-/*
 fun abs[x: Int] : Int {
-	x.lt[0] => 0.minus[x] && result.eq[0.minus[x]]
-	else x.gte[0] && result.eq[x]
-
+	(x<0) => (0-x) else (x)
 }
-*/
+
 
 /***************************************
 										Run
@@ -125,7 +124,4 @@ run depotCmd for 1 Drone, 10 Intersection, 3 Receptacle, 3 Commande, 3 EnsembleP
 										Check
 ***************************************/
 
-
-//fact : restreindre commande avec ensembleProduit
-//fact : capacité d'un receptacle ne doit pas être trop faible, capacite de l'ensemble pas trop importante
 

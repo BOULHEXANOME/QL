@@ -20,7 +20,8 @@ abs(r1.position.X-r2.position.X)+abs(r1.position.Y-r2.position.Y)<=3
 
 pred abs(x: Int, result: Int) {
 x.lt[0] => 0.minus[x] && result.eq[0.minus[x]]
-else x.gte[0] && result.eq[x] }
+else x.gte[0] && result.eq[x] 
+}
 
 
 

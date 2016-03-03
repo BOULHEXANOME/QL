@@ -84,6 +84,16 @@ fact IntersectionUnitaire {
 	not (i1.X=i2.X && i1.Y=i2.Y)
 }
 
+/* Il n'existe pas des intersections avec 2 receptacles ou entrepot*/
+fact ReceptacleUnitaire {
+	all disj r1,r2: Receptacle |
+	not (r1.position=r2.position)
+}
+
+fact EntrepotPasSurReceptacle {
+	all r: Receptacle | not (Entrepot.position = r.position)
+}
+
 
 //fact : restreindre commande avec ensembleProduit
 //fact : capacité d'un receptacle ne doit pas être trop faible, capacite de l'ensemble pas trop importante
@@ -121,11 +131,23 @@ pred deposerCmd {
 }
 
 // permet de trouver le prochain plus proche réceptacle pour remplir la liste
-pred calculerChemin[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
+/*pred calculerChemin[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
 	verifierDistanceRecep[r1, objectifFinal] 
 	=> d.chemin.listeReceptacles = d.chemin.listeReceptacles.add[r1]
 	else some r3 :Receptacle | (verifierDistanceRecep[r1,r3] && calculerChemin[d,r3,objectifFinal] && r3 != r1) 
 	=> d.chemin.listeReceptacles = d.chemin.listeReceptacles.add[r3] 
+}*/
+
+pred calculerChemin[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
+	some liste:seq Receptacle |
+	(liste[0] = r1 && liste[#liste-1] = objectifFinal &&
+	(all r:Receptacle | r in liste.elems && 
+	(verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]+1]])
+	||verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]-1]]))
+//	&& !hasDups[liste]
+	&& #elems[liste] = #liste-1
+	&& #liste=min[#liste]
+	=> d.chemin.listeReceptacles= liste
 }
 
 pred trouverPremierReceptacle[d:Drone] {
@@ -172,7 +194,7 @@ fun abs[x: Int] : Int {
 										Run
 ***************************************/
 
-run simuler for 3 Drone, 5 Intersection, 3 Receptacle, 3 Commande, 3 EnsembleProduits, 1 Chemin
+run simuler for 3 Drone, exactly 9 Intersection, exactly 3 Receptacle, 3 Commande, 3 EnsembleProduits, 1 Chemin
 
 
 /***************************************

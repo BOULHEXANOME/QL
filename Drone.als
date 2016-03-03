@@ -1,6 +1,5 @@
 open util/integer
 
-
 /***************************************
 										Sig
 ***************************************/
@@ -12,6 +11,11 @@ some sig Drone {
 	commande: lone Commande,
 	DCAP: Int,
 	Batterie: Int
+}
+
+one sig Temps{
+tempsActuel:Int,
+
 }
 
 some sig Receptacle {
@@ -44,7 +48,7 @@ sig Intersection {
 ***************************************/
 
 fact {
-	init // Predicat d'initialisation
+	initialiser // Predicat d'initialisation
 
 	all e:EnsembleProduits | some c:Commande | c.ensembleProd = e     // Ensemble de Produits appartient à une commande
 	all c:Commande | some e:Entrepot | c in e.ensembleCommandes      // Les commandes sont dans l'entrepôt
@@ -81,23 +85,56 @@ fact IntersectionUnitaire {
 										Pred
 ***************************************/
 
-pred init {
+pred simuler {
+	initialiser
+	livrer
+
+}
+
+pred initialiser {
 	all d:Drone | d.Batterie = 3
+	Temps.tempsActuel = 0
+	all d:Drone | attribuerCommande[d]
+}
+
+pred livrer {
+	
+}
+
+pred attribuerCommande[d:Drone] {
+	some c:Commande | no d.commande => d.commande = c
 }
  
-pred depotCmd {
+pred deposerCmd {
 	all d:Drone |
     (one d.commande  && d.commande.destination.position = d.position) =>
 	no d.commande
 }
 
-pred JeVeuxAllerACeReceptacle[r1:Receptacle, objectifFinal:Receptacle] {
-	distanceOk[r1, objectifFinal]||some r3 :Receptacle | distanceOk[r1,r3] && JeVeuxAllerACeReceptacle[r3,objectifFinal]&&r3!=r1
+pred allerACeReceptacle[r1:Receptacle, objectifFinal:Receptacle] {
+	verifierDistance[r1, objectifFinal]||some r3 :Receptacle | verifierDistance[r1,r3] && allerACeReceptacle[r3,objectifFinal]&&r3!=r1
 }
 
-pred distanceOk[r1:Receptacle, r2:Receptacle]{
+pred verifierDistance[r1:Receptacle, r2:Receptacle]{
 	abs[r1.position.X-r2.position.X] + abs[r1.position.Y-r2.position.Y] <=3
 }
+
+pred allerAuReceptacle[d:Drone]{
+	d.position.X<d.commande.destination.position.X => d.position.X=d.position.X+1
+	else d.position.X>d.commande.destination.position.X => d.position.X=d.position.X-1
+	else d.position.Y<d.commande.destination.position.Y => d.position.Y=d.position.Y+1
+	else d.position.Y>d.commande.destination.position.Y => d.position.Y=d.position.X-1
+	else allerAEntrepot[d]
+}
+
+pred allerAEntrepot[d:Drone]{
+	d.position.X<Entrepot.position.X => d.position.X=d.position.X+1
+	else d.position.X>Entrepot.position.X => d.position.X=d.position.X-1
+	else d.position.Y<Entrepot.position.Y => d.position.Y=d.position.Y+1
+	else d.position.Y>Entrepot.position.Y => d.position.Y=d.position.X-1
+	else attribuerCommande[d]
+}
+
 
 /***************************************
 										Fun
@@ -112,8 +149,9 @@ fun abs[x: Int] : Int {
 										Run
 ***************************************/
 
-run depotCmd for 1 Drone, 10 Intersection, 3 Receptacle, 3 Commande, 3 EnsembleProduits
+run deposerCmd for 1 Drone, 10 Intersection, 3 Receptacle, 3 Commande, 3 EnsembleProduits
 
+run allerAuReceptacle for 1 Drone, 10 Intersection, 3 Receptacle, 3 Commande, 3 EnsembleProduits
 
 
 /***************************************

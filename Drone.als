@@ -1,6 +1,14 @@
 open util/integer
 
 /***************************************
+										Let
+***************************************/
+/*
+let DCAP = 5
+let RCAP = 10
+*/
+
+/***************************************
 										Sig
 ***************************************/
 
@@ -9,22 +17,19 @@ open util/integer
 some sig Drone {
 	position: one Intersection,
 	commande: lone Commande,
-	DCAP: Int,
 	batterie: Int,
 	chemin : one Chemin
 }
 
 one sig Temps{
-tempsActuel:Int,
-
+	tempsActuel:Int
 }
 
-some sig Receptacle {
-	position: one Intersection,
-	RCAP: Int
+some sig Receptacle{
+	position: one Intersection
 }
 
-one sig Entrepot {
+one sig Entrepot{
 	position: one Intersection,
 	ensembleCommandes: set Commande
 }
@@ -57,12 +62,10 @@ fact {
 
 	all e:EnsembleProduits | some c:Commande | c.ensembleProd = e     // Ensemble de Produits appartient à une commande
 	all c:Commande | some e:Entrepot | c in e.ensembleCommandes      // Les commandes sont dans l'entrepôt
-	all e:EnsembleProduits | some dcap:Drone.DCAP | e.capacite <= dcap     // La capacité d'une commande est restreinte
+//	all e:EnsembleProduits | e.capacite <= DCAP     // La capacité d'une commande est restreinte
 	all c:Commande | one c.ensembleProd => c.destination.position != Entrepot.position     // Pas de commande livrée à l'entrepot
 
 	// A améliorer
-	all d:Drone | d.DCAP > 0 // implicite
-	all r:Receptacle | r.RCAP > 0 // implicite
 	all ep:EnsembleProduits | ep.capacite > 0 // implicite
 	all d:Drone | d.batterie >= 0 && d.batterie <= 3 // batterie du drone
 }
@@ -99,6 +102,8 @@ pred initialiser {
 	all d:Drone | d.batterie = 3
 	Temps.tempsActuel = 0
 	all d:Drone | attribuerCommande[d]
+	all d:Drone | trouverPremierReceptacle[d]
+	all d:Drone | calculerChemin[d, d.chemin.listeReceptacles[0], d.commande.destination]
 }
 
 pred iterer {
@@ -115,15 +120,26 @@ pred deposerCmd {
 	no d.commande
 }
 
-pred allerACeReceptacle[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
-	verifierDistance[r1, objectifFinal] 
+// permet de trouver le prochain plus proche réceptacle pour remplir la liste
+pred calculerChemin[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
+	verifierDistanceRecep[r1, objectifFinal] 
 	=> d.chemin.listeReceptacles = d.chemin.listeReceptacles.add[r1]
-	else some r3 :Receptacle | (verifierDistance[r1,r3] && allerACeReceptacle[d,r3,objectifFinal] && r3 != r1) 
+	else some r3 :Receptacle | (verifierDistanceRecep[r1,r3] && calculerChemin[d,r3,objectifFinal] && r3 != r1) 
 	=> d.chemin.listeReceptacles = d.chemin.listeReceptacles.add[r3] 
 }
 
-pred verifierDistance[r1:Receptacle, r2:Receptacle]{
+pred trouverPremierReceptacle[d:Drone] {
+	some r:Receptacle |	
+	verifierDistanceInter[d.position, r.position] 
+	=> d.chemin.listeReceptacles = d.chemin.listeReceptacles.add[r]
+}
+
+pred verifierDistanceRecep[r1:Receptacle, r2:Receptacle]{
 	abs[r1.position.X-r2.position.X] + abs[r1.position.Y-r2.position.Y] <=3
+}
+
+pred verifierDistanceInter[i1:Intersection, i2:Intersection]{
+	abs[i1.X-i2.X] + abs[i1.Y-i2.Y] <=3
 }
 
 pred allerAuReceptacle[d:Drone]{

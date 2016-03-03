@@ -10,7 +10,8 @@ some sig Drone {
 	position: one Intersection,
 	commande: lone Commande,
 	DCAP: Int,
-	Batterie: Int
+	batterie: Int,
+	chemin : Chemin
 }
 
 one sig Temps{
@@ -42,6 +43,10 @@ sig Intersection {
 	Y : Int,
 }
 
+sig Chemin {
+	chemin : set Intersection 
+}
+
 
 /***************************************
 										Fact
@@ -59,7 +64,7 @@ fact {
 	all d:Drone | d.DCAP > 0 // implicite
 	all r:Receptacle | r.RCAP > 0 // implicite
 	all ep:EnsembleProduits | ep.capacite > 0 // implicite
-	all d:Drone | d.Batterie >= 0 && d.Batterie <= 3 // batterie du drone
+	all d:Drone | d.batterie >= 0 && d.batterie <= 3 // batterie du drone
 }
 
 /* Il y a au moins un receptacle sur une intersection voisine de l'entrepot */
@@ -72,7 +77,7 @@ some r:Receptacle|
 
 /* Il n'existe pas 2 intersectiones identiques*/
 fact IntersectionUnitaire {
-	all i1: Intersection |all i2:Intersection|
+	all disj i1,i2: Intersection |
 	not (i1.X=i2.X && i1.Y=i2.Y)
 }
 
@@ -87,18 +92,18 @@ fact IntersectionUnitaire {
 
 pred simuler {
 	initialiser
-	livrer
+	iterer
 
 }
 
 pred initialiser {
-	all d:Drone | d.Batterie = 3
+	all d:Drone | d.batterie = 3
 	Temps.tempsActuel = 0
 	all d:Drone | attribuerCommande[d]
 }
 
-pred livrer {
-	
+pred iterer {
+	all d:Drone | allerAuReceptacle[d]
 }
 
 pred attribuerCommande[d:Drone] {
@@ -149,9 +154,7 @@ fun abs[x: Int] : Int {
 										Run
 ***************************************/
 
-run deposerCmd for 1 Drone, 10 Intersection, 3 Receptacle, 3 Commande, 3 EnsembleProduits
-
-run allerAuReceptacle for 1 Drone, 10 Intersection, 3 Receptacle, 3 Commande, 3 EnsembleProduits
+run simuler for 3 Drone, 5 Intersection, 3 Receptacle, 3 Commande, 3 EnsembleProduits, 1 Chemin
 
 
 /***************************************

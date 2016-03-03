@@ -11,7 +11,7 @@ some sig Drone {
 	commande: lone Commande,
 	DCAP: Int,
 	batterie: Int,
-	chemin : Chemin
+	chemin : one Chemin
 }
 
 one sig Temps{
@@ -44,7 +44,7 @@ sig Intersection {
 }
 
 sig Chemin {
-	chemin : set Intersection 
+	listeReceptacles : seq Receptacle
 }
 
 
@@ -93,7 +93,6 @@ fact IntersectionUnitaire {
 pred simuler {
 	initialiser
 	iterer
-
 }
 
 pred initialiser {
@@ -116,8 +115,11 @@ pred deposerCmd {
 	no d.commande
 }
 
-pred allerACeReceptacle[r1:Receptacle, objectifFinal:Receptacle] {
-	verifierDistance[r1, objectifFinal]||some r3 :Receptacle | verifierDistance[r1,r3] && allerACeReceptacle[r3,objectifFinal]&&r3!=r1
+pred allerACeReceptacle[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
+	verifierDistance[r1, objectifFinal] 
+	=> d.chemin.listeReceptacles = d.chemin.listeReceptacles.add[r1]
+	else some r3 :Receptacle | (verifierDistance[r1,r3] && allerACeReceptacle[d,r3,objectifFinal] && r3 != r1) 
+	=> d.chemin.listeReceptacles = d.chemin.listeReceptacles.add[r3] 
 }
 
 pred verifierDistance[r1:Receptacle, r2:Receptacle]{

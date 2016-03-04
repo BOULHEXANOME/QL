@@ -64,11 +64,11 @@ fact {
 }
 
 /* Il y a au moins un receptacle sur une intersection voisine de l'entrepot */
-fact{
-some r:Receptacle|
+fact EntrepotAUnVoisin{
+some r:Receptacle | 
 ((r.position.X = Entrepot.position.X+1 || r.position.X = Entrepot.position.X-1) && (r.position.Y = Entrepot.position.Y))
 ||
-((r.position.X = Entrepot.position.X)&& (r.position.Y = Entrepot.position.Y+1 || r.position.Y = Entrepot.position.Y-1))
+((r.position.X = Entrepot.position.X) && (r.position.Y = Entrepot.position.Y+1 || r.position.Y = Entrepot.position.Y-1))
 }
 
 /* Il n'existe pas 2 intersectiones identiques*/
@@ -92,12 +92,18 @@ fact CheminPasDeDoublon {
 	all d: Drone | not d.chemin.hasDups
 }
 
-/*
 
 fact ReceptaclesVoisins {
-	all r1:Receptacle | some r2:Receptacle && (abs[r1.position.X-r2.position.X] + abs[r1.position.Y-r2.position.Y]) < 4
+	
+	some chemin: seq Receptacle | all n: Int | n >=0 && n < #chemin => distance[chemin[n].position,chemin[n+1].position] <= 3
+
+//all r1:Receptacle | all r2:Receptacle | testerChemin[r1, r2] 
 }
-*/
+
+fact LimitationPositions {
+	all i:Intersection | i.X <=3 && i.X >= -3 && i.Y <= 3 && i.Y >= -3
+}
+
 
 //fact : restreindre commande avec ensembleProduit
 //fact : capacité d'un receptacle ne doit pas être trop faible, capacite de l'ensemble pas trop importante
@@ -151,6 +157,14 @@ pred calculerChemin[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
 	=> d.chemin= liste
 }
 
+pred testerChemin[r1:Receptacle, objectifFinal:Receptacle] {
+	some liste:seq Receptacle |
+	(first[liste] = r1 && last[liste] = objectifFinal &&
+	(all r:Receptacle | r in liste.elems && 
+	((verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]+1]] || r=last[liste]))
+	&&(verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]-1]] || r=first[liste])))
+}
+
 pred trouverPremierReceptacle[d:Drone] {
 	some r:Receptacle |	
 	verifierDistanceInter[d.position, r.position] 
@@ -158,7 +172,7 @@ pred trouverPremierReceptacle[d:Drone] {
 }
 
 pred verifierDistanceRecep[r1:Receptacle, r2:Receptacle]{
-	abs[r1.position.X-r2.position.X] + abs[r1.position.Y-r2.position.Y] <=3
+	distance[r1.position, r2.position] <= 3
 }
 
 pred verifierDistanceInter[i1:Intersection, i2:Intersection]{
@@ -187,15 +201,23 @@ pred allerAEntrepot[d:Drone]{
 ***************************************/
 
 fun abs[x: Int] : Int {
-	(x<0) => (0-x) else (x)
+	(x<0) => x.mul[-1] else (x)
 }
 
+/*
+fun distance[i1,i2: Intersection]: Int {
+    abs[i1.X-i2.X] + abs[i1.Y - i2.Y]
+}*/
+
+fun distance[i1,i2: Intersection]: Int {
+    abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]
+}
 
 /***************************************
 										Run
 ***************************************/
 
-run simuler for exactly 2 Drone, exactly 5 Intersection, exactly 4 Receptacle, 3 Commande, 3 EnsembleProduits
+run simuler for exactly 1 Drone, exactly 5 Intersection, exactly 4 Receptacle, 3 Commande, 3 EnsembleProduits
 
 
 /***************************************

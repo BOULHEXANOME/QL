@@ -26,7 +26,12 @@ one sig Temps{
 }
 
 some sig Receptacle{
-	position: one Intersection
+	position: one Intersection,
+	next: lone Receptacle
+}
+
+one sig Chemin{
+	root: lone Receptacle
 }
 
 one sig Entrepot{
@@ -92,16 +97,27 @@ fact CheminPasDeDoublon {
 	all d: Drone | not d.chemin.hasDups
 }
 
-
+//essai raté pour lier les receptacle N°1 et N°2
 fact ReceptaclesVoisins {
-	
-	some chemin: seq Receptacle | all n: Int | n >=0 && n < #chemin => distance[chemin[n].position,chemin[n+1].position] <= 3
+//	some chemin: seq Receptacle | all n: Int | n > -1 && n < #chemin => distance[chemin[n].position,chemin[n+1].position] < 4
+//	some chemin: seq Receptacle | all r:Receptacle |  all n: Int | r in elems[chemin] && n > -1 && n < #chemin && distance[chemin[n].position,chemin[n+1].position] < 4
 
-//all r1:Receptacle | all r2:Receptacle | testerChemin[r1, r2] 
+	//all r1:Receptacle | all r2:Receptacle | testerChemin[r1, r2] 
+}
+//essai raté pour lier les receptacle N°3
+fact TousLesReceptaclesSontLies{
+//	all r1,r2:Receptacle | some chemin:seq Receptacle | r1 in chemin.elems && r2 in chemin.elems && r1!=r2
 }
 
+//essai pour lier les receptacle N°4
+fact nextNotReflexive { no r:Receptacle | r = r.next }
+fact allNodesBelongToSomeQueue {
+		all r:Receptacle | r in Chemin.root.*next
+}
+fact nextNotCyclic { no r:Receptacle | r in r.^next }
+fact nextGoodDistance {all r:Receptacle | distance[r.position,r.next.position]<4}
 fact LimitationPositions {
-	all i:Intersection | i.X <=3 && i.X >= -3 && i.Y <= 3 && i.Y >= -3
+	all i:Intersection | i.X <=10 && i.X >= -10 && i.Y <= 10 && i.Y >= -10
 }
 
 
@@ -157,6 +173,8 @@ pred calculerChemin[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
 	=> d.chemin= liste
 }
 
+
+
 pred testerChemin[r1:Receptacle, objectifFinal:Receptacle] {
 	some liste:seq Receptacle |
 	(first[liste] = r1 && last[liste] = objectifFinal &&
@@ -165,6 +183,7 @@ pred testerChemin[r1:Receptacle, objectifFinal:Receptacle] {
 	&&(verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]-1]] || r=first[liste])))
 }
 
+
 pred trouverPremierReceptacle[d:Drone] {
 	some r:Receptacle |	
 	verifierDistanceInter[d.position, r.position] 
@@ -172,7 +191,7 @@ pred trouverPremierReceptacle[d:Drone] {
 }
 
 pred verifierDistanceRecep[r1:Receptacle, r2:Receptacle]{
-	distance[r1.position, r2.position] <= 3
+	distance[r1.position, r2.position] < 4
 }
 
 pred verifierDistanceInter[i1:Intersection, i2:Intersection]{
@@ -217,7 +236,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run simuler for exactly 1 Drone, exactly 5 Intersection, exactly 4 Receptacle, 3 Commande, 3 EnsembleProduits
+run simuler for exactly 1 Drone, exactly 10 Intersection, exactly 4 Receptacle, 3 Commande, 3 EnsembleProduits, 6 int
 
 
 /***************************************

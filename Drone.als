@@ -18,7 +18,7 @@ some sig Drone {
 	position: one Intersection,
 	commande: lone Commande,
 	batterie: Int,
-	chemin : one Chemin
+	chemin : seq Receptacle
 }
 
 one sig Temps{
@@ -48,18 +48,11 @@ sig Intersection {
 	Y : Int,
 }
 
-sig Chemin {
-	listeReceptacles : seq Receptacle
-}
-
-
 /***************************************
 										Fact
 ***************************************/
 
 fact {
-	initialiser // Predicat d'initialisation
-
 	all e:EnsembleProduits | some c:Commande | c.ensembleProd = e     // Ensemble de Produits appartient à une commande
 	all c:Commande | some e:Entrepot | c in e.ensembleCommandes      // Les commandes sont dans l'entrepôt
 //	all e:EnsembleProduits | e.capacite <= DCAP     // La capacité d'une commande est restreinte
@@ -84,7 +77,7 @@ fact IntersectionUnitaire {
 	not (i1.X=i2.X && i1.Y=i2.Y)
 }
 
-/* Il n'existe pas des intersections avec 2 receptacles ou entrepot*/
+/* Il n'existe pas des intersections avec 2 receptacles */
 fact ReceptacleUnitaire {
 	all disj r1,r2: Receptacle |
 	not (r1.position=r2.position)
@@ -94,6 +87,17 @@ fact EntrepotPasSurReceptacle {
 	all r: Receptacle | not (Entrepot.position = r.position)
 }
 
+//Le chemin ne peut pas passer deux fois par la même intersection
+fact CheminPasDeDoublon {
+	all d: Drone | not d.chemin.hasDups
+}
+
+/*
+
+fact ReceptaclesVoisins {
+	all r1:Receptacle | some r2:Receptacle && (abs[r1.position.X-r2.position.X] + abs[r1.position.Y-r2.position.Y]) < 4
+}
+*/
 
 //fact : restreindre commande avec ensembleProduit
 //fact : capacité d'un receptacle ne doit pas être trop faible, capacite de l'ensemble pas trop importante
@@ -113,7 +117,7 @@ pred initialiser {
 	Temps.tempsActuel = 0
 	all d:Drone | attribuerCommande[d]
 	all d:Drone | trouverPremierReceptacle[d]
-	all d:Drone | calculerChemin[d, d.chemin.listeReceptacles[0], d.commande.destination]
+	all d:Drone | calculerChemin[d, first[d.chemin], d.commande.destination]
 }
 
 pred iterer {
@@ -140,20 +144,17 @@ pred deposerCmd {
 
 pred calculerChemin[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
 	some liste:seq Receptacle |
-	(liste[0] = r1 && liste[#liste-1] = objectifFinal &&
+	(first[liste] = r1 && last[liste] = objectifFinal &&
 	(all r:Receptacle | r in liste.elems && 
-	(verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]+1]])
-	||verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]-1]]))
-//	&& !hasDups[liste]
-	&& #elems[liste] = #liste-1
-	&& #liste=min[#liste]
-	=> d.chemin.listeReceptacles= liste
+	((verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]+1]] || r=last[liste]))
+	&&(verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]-1]] || r=first[liste])))
+	=> d.chemin= liste
 }
 
 pred trouverPremierReceptacle[d:Drone] {
 	some r:Receptacle |	
 	verifierDistanceInter[d.position, r.position] 
-	=> d.chemin.listeReceptacles = d.chemin.listeReceptacles.add[r]
+	=> d.chemin= d.chemin.add[r]
 }
 
 pred verifierDistanceRecep[r1:Receptacle, r2:Receptacle]{
@@ -194,7 +195,7 @@ fun abs[x: Int] : Int {
 										Run
 ***************************************/
 
-run simuler for 3 Drone, exactly 9 Intersection, exactly 3 Receptacle, 3 Commande, 3 EnsembleProduits, 1 Chemin
+run simuler for exactly 2 Drone, exactly 5 Intersection, exactly 4 Receptacle, 3 Commande, 3 EnsembleProduits
 
 
 /***************************************

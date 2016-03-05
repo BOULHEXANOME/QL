@@ -3,10 +3,10 @@ open util/integer
 /***************************************
 										Let
 ***************************************/
-/*
+
 let DCAP = 5
 let RCAP = 10
-*/
+
 
 /***************************************
 										Sig
@@ -18,7 +18,8 @@ some sig Drone {
 	position: one Intersection,
 	commande: lone Commande,
 	batterie: Int,
-	chemin : seq Receptacle
+//	chemin : seq Receptacle
+	chemin : one Chemin
 }
 
 one sig Temps {
@@ -27,12 +28,14 @@ one sig Temps {
 
 some sig Receptacle {
 	position: one Intersection,
-	next: lone Receptacle
+	next: lone Receptacle,
+	contenu : Int
 }
 
 
-one sig Chemin {
-	root: one Receptacle // one ou lone ?
+sig Chemin {
+	actuel: one Receptacle,
+	suivant: lone Chemin
 }
 
 one sig Entrepot {
@@ -41,7 +44,7 @@ one sig Entrepot {
 }
 
 sig EnsembleProduits {
-	capacite: Int
+	contenu: Int
 }
 
 some sig Commande {
@@ -60,17 +63,31 @@ sig Intersection {
 
 fact {
 	all e:EnsembleProduits | some c:Commande | c.ensembleProd = e     // Ensemble de Produits appartient à une commande
-	all c:Commande | some e:Entrepot | c in e.ensembleCommandes      // Les commandes sont dans l'entrepôt
-//	all e:EnsembleProduits | e.capacite <= DCAP     // La capacité d'une commande est restreinte
-	all c:Commande | one c.ensembleProd => c.destination.position != Entrepot.position     // Pas de commande livrée à l'entrepot
+	all c:Commande | some e:Entrepot | c in e.ensembleCommandes      // Les commandes sont dans l'entrepôt. ça sert à rien ça non ?
+	all c:Commande | one c.ensembleProd => c.destination.position != Entrepot.position     // Pas de commande livrée à l'entrepot si la commande contient un ensembleProd
 
 	// A améliorer
-	all ep:EnsembleProduits | ep.capacite > 0 // implicite
-	all d:Drone | d.batterie >= 0 && d.batterie <= 3 // batterie du drone
+	all ep:EnsembleProduits | ep.contenu> 0 // implicite
+	
+}
+
+// la batterie du drone est entre 0 et 3
+fact BatterieDrone {
+	all d:Drone | d.batterie >= 0 && d.batterie <= 3
+}
+
+// les drones ont une capacité max de DCAP
+fact CapaciteDrone {
+	all d: Drone | d.commande.ensembleProd.contenu <= DCAP
+}
+
+// les réceptacles ont une capacité max de RCAP
+fact CapaciteReceptacle {
+	all r: Receptacle | r.contenu <= RCAP
 }
 
 /* Il y a au moins un receptacle sur une intersection voisine de l'entrepot */
-fact EntrepotAUnVoisin{
+fact EntrepotAUnVoisin {
 	some r:Receptacle | 
 	((r.position.X = Entrepot.position.X+1 || r.position.X = Entrepot.position.X-1) && (r.position.Y = Entrepot.position.Y))
 	||
@@ -116,7 +133,7 @@ fact TousLesReceptaclesSontLies{
 */
 
 	//essai pour lier les receptacle N°4
-
+/*
 // le suivant d'un réceptacle ne peut être lui-même
 fact SuivantNonReflexif {
 	no r:Receptacle | r = r.next
@@ -140,6 +157,29 @@ fact VerificationDistance {
 // taille de la grille
 fact LimitationPositions {
 	all i:Intersection | i.X <=10 && i.X >= -10 && i.Y <= 10 && i.Y >= -10
+}*/
+
+
+	// DERNIER TENTATIVE FAITS SUR LE CHEMIN
+// il n'y a pas deux chemins identiques
+fact CheminUnique {
+	all disj c1, c2: Chemin | c1.actuel != c2.actuel || c1.suivant != c2.suivant
+}
+
+// il y a une distance de 3 max entre chaque réceptacle
+fact VerifierDistance {
+	all c:Chemin | one c.suivant => distance[c.actuel.position, c.suivant.actuel.position] <= 3
+}
+
+// il y a toujours un chemin entre deux réceptacles
+fact ToujoursChemin {
+	all r1, r2: Receptacle |
+		r1 != r2 => (some ch:Chemin | calculerCheminBis[r1, r2, ch])
+}
+
+// le chemin ne boucle pas sur lui-même
+fact SuivantNonCyclique {
+	all c: Chemin | c.actuel not in c.^suivant.actuel
 }
 
 
@@ -161,15 +201,17 @@ pred initialiser {
 	all d:Drone | d.batterie = 3
 	all d:Drone | attribuerCommande[d]
 	all d:Drone | trouverPremierReceptacle[d]
-	all d:Drone | calculerChemin[d, first[d.chemin], d.commande.destination]
+//	all d:Drone | calculerChemin[d, first[d.chemin], d.commande.destination]
+	all d:Drone | some c:Chemin | calculerCheminBis[d.chemin.actuel, d.commande.destination, c]
 }
 
 pred iterer {
 	all d:Drone | allerAuReceptacle[d]
 }
 
+
 pred attribuerCommande[d:Drone] {
-	some c:Commande | no d.commande => d.commande = c
+	one c:Commande | no d.commande => d.commande = c // one Commande ou some ?
 }
  
 pred deposerCmd {
@@ -186,13 +228,23 @@ pred deposerCmd {
 	=> d.chemin.listeReceptacles = d.chemin.listeReceptacles.add[r3] 
 }*/
 
-pred calculerChemin[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
+// calcul du chemin avec notre technique
+/*pred calculerChemin[d:Drone, r1:Receptacle, objectifFinal:Receptacle] {
 	some liste:seq Receptacle |
 	(first[liste] = r1 && last[liste] = objectifFinal &&
 	(all r:Receptacle | r in liste.elems && 
 	((verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]+1]] || r=last[liste]))
 	&&(verifierDistanceRecep[liste[liste.idxOf[r]], liste[liste.idxOf[r]-1]] || r=first[liste])))
 	=> d.chemin= liste
+}*/
+
+// calcul du chemin avec le chemin chaîné
+pred calculerCheminBis[debut, fin: Receptacle, cheminDeb: Chemin] {
+	one cheminFin: Chemin |
+	cheminDeb.actuel = debut // le chemin commence par le premier réceptacle
+	&& cheminFin.actuel = fin // et termine par le dernier
+	&& no cheminFin.suivant // le dernier chemin n'a pas de suivant
+	&& cheminFin in cheminDeb.^suivant // le dernier chemin fait partie des suivants du premier (fermeture transitive)
 }
 
 
@@ -210,7 +262,8 @@ pred testerChemin[r1:Receptacle, objectifFinal:Receptacle] {
 pred trouverPremierReceptacle[d:Drone] {
 	some r:Receptacle |	
 	verifierDistanceInter[d.position, r.position] 
-	=> d.chemin= d.chemin.add[r]
+//	=> d.chemin= d.chemin.add[r]
+	=> d.chemin.actuel = r
 }
 
 pred verifierDistanceRecep[r1:Receptacle, r2:Receptacle]{
@@ -258,7 +311,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run simuler for exactly 1 Drone, exactly 10 Intersection, exactly 4 Receptacle, 3 Commande, 3 EnsembleProduits, 6 int
+run simuler for exactly 1 Drone, exactly 10 Intersection, exactly 4 Receptacle, 3 Commande, 3 EnsembleProduits, 6 int, 4 Chemin
 
 
 /***************************************

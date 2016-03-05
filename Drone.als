@@ -96,8 +96,7 @@ fact EntrepotAUnVoisin {
 
 /* Il n'existe pas 2 intersectiones identiques*/
 fact IntersectionUnitaire {
-	all disj i1,i2: Intersection |
-	not (i1.X=i2.X && i1.Y=i2.Y)
+	all disj i1,i2: Intersection | i1 != i2
 }
 
 /* Il n'existe pas des intersections avec 2 receptacles */
@@ -152,12 +151,12 @@ fact SuivantPasCyclique {
 // la distance entre un réceptacle et son suivant est forcément inférieure ou égale à 3
 fact VerificationDistance {
 	all r:Receptacle | distance[r.position,r.next.position]<4 
-}
+}*/
 
 // taille de la grille
 fact LimitationPositions {
 	all i:Intersection | i.X <=10 && i.X >= -10 && i.Y <= 10 && i.Y >= -10
-}*/
+}
 
 
 	// DERNIER TENTATIVE FAITS SUR LE CHEMIN
@@ -311,7 +310,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run simuler for exactly 1 Drone, exactly 10 Intersection, exactly 4 Receptacle, 3 Commande, 3 EnsembleProduits, 6 int, 4 Chemin
+run simuler for exactly 1 Drone, exactly 5 Intersection, exactly 2 Receptacle, 3 Commande, 3 EnsembleProduits, 6 int, 5 Chemin
 
 
 /***************************************

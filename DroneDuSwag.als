@@ -1,5 +1,4 @@
 open util/integer
-
 /***************************************
 										Let
 ***************************************/
@@ -25,7 +24,6 @@ one sig Temps {
 
 some sig Receptacle {
 	position: one Intersection,
-	distances : seq Int,
 	listeRecep : seq Receptacle,
 	contenu : Int
 }
@@ -45,8 +43,8 @@ some sig Commande {
 }
 
 sig Intersection {
-	X : Int,
-	Y : Int
+	x : Int,
+	y : Int
 }
 
 
@@ -88,15 +86,16 @@ fact PasLivraisonEntrepot {
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
 fact EntrepotAUnVoisin {
 	some r:Receptacle | 
-	((r.position.X = Entrepot.position.X.add[1] || r.position.X = Entrepot.position.X.sub[1]) && (r.position.Y = Entrepot.position.Y))
+	((r.position.x = Entrepot.position.x.add[1] || r.position.x = Entrepot.position.x.sub[1]) && (r.position.y = Entrepot.position.y))
 	||
-	((r.position.X = Entrepot.position.X) && (r.position.Y = Entrepot.position.Y.add[1] || r.position.Y = Entrepot.position.Y.sub[1]))
+	((r.position.x = Entrepot.position.x) && (r.position.y = Entrepot.position.y.add[1] || r.position.y = Entrepot.position.y.sub[1]))
+	&& (all d:Drone  | first[d.chemin] = r)
 }
 
 
 // Il n'existe pas 2 intersectiones identiques
 fact IntersectionUnitaire {
-	all disj i1,i2: Intersection | i1.X != i2.X || i1.Y != i2.Y
+	all disj i1,i2: Intersection | i1.x != i2.x || i1.y != i2.y
 }
 
 // Il n'existe pas des intersections avec 2 receptacles
@@ -112,7 +111,7 @@ fact EntrepotPasSurReceptacle {
 
 // taille de la grille
 fact LimitationPositions {
-	all i:Intersection | i.X <=6 && i.X >= 0 && i.Y <= 6 && i.Y >= 0
+	all i:Intersection | i.x <=6 && i.x >= 0 && i.y <= 6 && i.y >= 0
 }
 
 fact NonLuiMeme {
@@ -120,11 +119,22 @@ fact NonLuiMeme {
 }
 
 fact ListeReceptacle {
-	all r1:Receptacle | some r2:Receptacle | distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0 =>
-	r2 in elems[r1.listeRecep]
-	all r1:Receptacle | some r2:Receptacle | distance[r1.position,r2.position] in elems[r1.distances]	
-	//r1.listeRecep = r1.listeRecep.add[r2] 
+	all r1:Receptacle | some r2:Receptacle | distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0 &&
+	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
 }
+fact ListeReceptacle2{
+	no r1:Receptacle | some r3:Receptacle | distance[r1.position, r3.position] > 3 &&
+	r3 in elems[r1.listeRecep]
+}
+fact ListeReceptacle3{
+	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
+	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
+
+}
+fact ListeReceptacle4{
+	all r1:Receptacle | ! hasDups[r1.listeRecep]
+}
+
 
 /*
 // détermination du nombre d'instances
@@ -141,11 +151,31 @@ fact NombreInstances {
 										Pred
 ***************************************/
 
-pred initialiser {
-	all d:Drone | d.batterie = 3
+pred simuler {
+	initialiser
+	//iterer
 }
 
+pred initialiser {
+	all d:Drone | d.batterie = 3
+	all d:Drone | calculerChemin[d, d.commande.destination]
+}
+
+/*pred trouverPremierReceptacle[d: Drone] {
+	one r:Receptacle | distance[Entrepot.position, r.position] = 1 <=> first[d.chemin] = r
+}*/
+/*fun trouverPremierReceptacle : Receptacle{
+	{r:Receptacle | distance[Entrepot.position, r.position] = 1}
+}*/
+
 pred remplirListeReceptaclesAccessibles {
+}
+
+pred calculerChemin[d:Drone, r2:Receptacle] {
+	one r1 :Receptacle= trouverPremierReceptacle|
+	one chemin : seq Receptacle |  first[chemin]=r1 && last[chemin]=r2
+	all r : Receptacle | r in d.chemin.elems && last[d.chemin] != r//est pas dernier elem
+	=> r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
 }
 
 
@@ -160,15 +190,14 @@ fun abs[x: Int] : Int {
 
 // calcule la distance entre deux intersections
 fun distance[i1,i2: Intersection]: Int {
-//    abs[abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]]
-	i1.X.sub[i2.X].add[i1.Y.sub[i2.Y]]
+    abs[abs[i1.x.sub[i2.x]].add[abs[i1.y.sub[i2.y]]]]
 }
  
 /***************************************
 										Run
 ***************************************/
 
-run initialiser for 1 Drone, exactly 3 Receptacle, 1 EnsembleProduits, 1 Commande, 5 Intersection, 6 int
+run initialiser for exactly 2 Drone, exactly 4 Receptacle, 1 EnsembleProduits, exactly 2 Commande, 6 Intersection, 6 int
 
 /***************************************
 										Assert

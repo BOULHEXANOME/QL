@@ -23,11 +23,11 @@ one sig Temps {
 }
 
 abstract sig PositionCible{
-	position: one Intersection,
+	listeRecep : seq Receptacle,
+	position: one Intersection
 }
 
 some sig Receptacle extends PositionCible{
-	listeRecep : seq Receptacle,
 	contenu : Int
 }
 
@@ -172,8 +172,10 @@ pred initialiser {
 
 pred calculerChemin[d:Drone] {
 	all r : Receptacle |
-		last[d.chemin] != r && r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+		/*last[d.chemin] != r && */
+		r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
 		=> r in d.chemin.elems
+		
 }
 
 /***************************************

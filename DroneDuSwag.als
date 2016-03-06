@@ -132,10 +132,12 @@ fact ListeReceptacleAjoutTousAccessibles{
 fact ListeReceptacleSansDoublons{
 	all r1:Receptacle | ! hasDups[r1.listeRecep]
 }
-/*
+
 fact TousReceptaclesAccessibles{
-	all disj r1,r2: Receptacle | calculerCheminEntreDeuxReceptacles[r1,r2]
-}*/
+	all r1,r2: Receptacle | some chemin: seq Receptacle | some r : Receptacle |
+		/*last[chemin] != r && */last[chemin] = r1 && first[chemin] = r2  && r in chemin[idxOf[chemin,r]+1].listeRecep.elems =>
+ 		r in chemin.elems
+}
 
 fact CheminSansDoublons{
 //	all d: Drone | ! hasDups[d.chemin]
@@ -173,13 +175,6 @@ pred calculerChemin[d:Drone] {
 		last[d.chemin] != r && r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
 		=> r in d.chemin.elems
 }
-/*
-pred calculerCheminEntreDeuxReceptacles[r1, r2: Receptacle] {
-	 some chemin: seq Receptacle | some r : Receptacle |
-		r in chemin.elems && last[chemin] != r && last[chemin] = r1 && first[chemin] = r2 =>
- 		r in chemin[idxOf[chemin,r]+1].listeRecep.elems 
-}*/
-
 
 /***************************************
 										Fun

@@ -194,8 +194,7 @@ fun abs[x: Int] : Int {
 
 // calcule la distance entre deux intersections
 fun distance[i1,i2: Intersection]: Int {
-//    abs[abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]]
-	i1.X.sub[i2.X].add[i1.Y.sub[i2.Y]]
+    abs[abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]]
 }
  
 /***************************************

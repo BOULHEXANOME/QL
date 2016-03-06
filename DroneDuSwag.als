@@ -114,24 +114,24 @@ fact LimitationPositions {
 	all i:Intersection | i.x <=6 && i.x >= 0 && i.y <= 6 && i.y >= 0
 }
 
-fact NonLuiMeme {
+fact ReceptacleNePeutPasAllerVersLuiMeme {
 	all r:Receptacle | r not in r.listeRecep.elems
 }
 
-fact ListeReceptacle {
-	all r1:Receptacle | some r2:Receptacle | distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0 &&
-	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
+
+// Remplissage liste des receptacles accessibles
+fact ListeReceptacleAuMoins1Accessible {
+	all r1:Receptacle | some r2:Receptacle | 	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
 }
-fact ListeReceptacle2{
-	no r1:Receptacle | some r3:Receptacle | distance[r1.position, r3.position] > 3 &&
+fact ListeReceptacleContraintesDistance{
+	no r1:Receptacle | some r3:Receptacle | (distance[r1.position, r3.position] > 3 || distance[r1.position, r3.position]<=0) &&
 	r3 in elems[r1.listeRecep]
 }
-fact ListeReceptacle3{
+fact ListeReceptacleAjoutTousAccessibles{
 	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
 	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
-
 }
-fact ListeReceptacle4{
+fact ListeReceptaclePasDeDoublons{
 	all r1:Receptacle | ! hasDups[r1.listeRecep]
 }
 
@@ -158,25 +158,25 @@ pred simuler {
 
 pred initialiser {
 	all d:Drone | d.batterie = 3
-	all d:Drone | calculerChemin[d, d.commande.destination]
+	//all d:Drone | calculerChemin[d, d.commande.destination]
 }
 
 /*pred trouverPremierReceptacle[d: Drone] {
 	one r:Receptacle | distance[Entrepot.position, r.position] = 1 <=> first[d.chemin] = r
 }*/
-/*fun trouverPremierReceptacle : Receptacle{
+fun trouverPremierReceptacle : Receptacle{
 	{r:Receptacle | distance[Entrepot.position, r.position] = 1}
-}*/
+}
 
 pred remplirListeReceptaclesAccessibles {
 }
-
+/*
 pred calculerChemin[d:Drone, r2:Receptacle] {
 	one r1 :Receptacle= trouverPremierReceptacle|
 	one chemin : seq Receptacle |  first[chemin]=r1 && last[chemin]=r2
 	all r : Receptacle | r in d.chemin.elems && last[d.chemin] != r//est pas dernier elem
 	=> r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
-}
+}*/
 
 
 /***************************************

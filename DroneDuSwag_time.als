@@ -17,7 +17,7 @@ some sig Drone {
 	position: Intersection one -> Temps,
 	commande: lone Commande,
 	batterie: Int one->Temps,
-	chemin : seq Receptacle
+	chemin : seq Receptacle -> Temps
 }
 
 sig Temps {}
@@ -68,7 +68,7 @@ fact CapaciteReceptacle {
 
 // Ensemble de Produits appartient à une commande
 fact EnsembleProdDansCommande {
-	all e:EnsembleProduits | some c:Commande | c.ensembleProd = e
+	all e:EnsembleProduits, t:Temps | some c:Commande | c.ensembleProd.t = e
 }
 
 // L'entrepôt a une liste de toutes les commandes
@@ -78,7 +78,7 @@ fact EntrepotListeCommande {
 
 // Si la commande contient un ensemble de prod, alors elle ne peut pas être livrée à l'entrepôt
 fact PasLivraisonEntrepot {
-	all c:Commande | one c.ensembleProd => c.destination.position != Entrepot.position
+	all c:Commande,t:Temps| one c.ensembleProd => c.destination.t.position != Entrepot.position
 }
 
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
@@ -139,9 +139,23 @@ fact NombreInstances {
 
 pred initialiser {
 	all d:Drone | d.batterie.first = 3
+	all d:Drone | d.position.first = Entrepot.position
+	all c:Commande | c.destination.first.position = Entrepot.position
+	
+	all c:Commande | c.ensembleProd.first.contenu > 0
+	all d:Drone | no r:seq Receptacle |d.chemin.first = r
+
+	
+	
 }
 
 pred remplirListeReceptaclesAccessibles {
+}
+
+pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
+	i = Entrepot.position //L'entrepôt est toujours disponible
+	||
+	all d:Drone - d'| d.position.t' != i
 }
 
 pred go {
@@ -150,21 +164,32 @@ pred go {
 	all t:Temps - last |let t'=t.next |
 	{
 		all d:Drone | moveDrone[t,t',d]
-		
 	}
 }
 
 pred moveDrone[t,t':Temps, d:Drone]{
 
 	//majBatterie
-	d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
+	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
 	d.position.t' = d.position.t => d.batterie.t' = d.batterie.t else//immobile
 	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
+	*/
 	
 	d.position.t = d.commande.destination.t.position => {//Le drone est a destination
-		d.commande.destination.contenu.t' = d.commande.destination.contenu.t.add[d.commande.ensembleProd.t]//Le réceptacle change sa capacité
-		d.commande.ensembleProd.t = 0
-		d.commande.destination.t' = Entrepot
+
+
+		d.position.t = Entrepot.position => { //entrepot destination
+			
+		} else { // réceptacle destination
+			d.commande.destination.t.contenu.t' = (d.commande.destination.t.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
+			d.commande.ensembleProd.t.contenu = 0
+			d.commande.destination.t'.position = Entrepot.position
+		}
+	}else{//Le drone n'est pas à destination
+			intersectionVide[t,t',d,d.chemin.t.first.position] => { //Si on peut bouger, on le fait
+			d.position.t' = d.chemin.t.first.position//on déplace le drone
+			d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
+		}
 	}
 }
 
@@ -187,7 +212,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run go for 1 Drone, exactly 3 Receptacle, 1 EnsembleProduits, 1 Commande, 5 Intersection, 6 int, 10 Temps
+check fin for 1 Drone, exactly 1 Receptacle, 1 EnsembleProduits, 1 Commande, 2 Intersection, 6 int, 10 Temps
 
 /***************************************
 										Assert
@@ -196,6 +221,13 @@ run go for 1 Drone, exactly 3 Receptacle, 1 EnsembleProduits, 1 Commande, 5 Inte
 assert positive {
 	no x:Int | x.abs < 0
 	all i1:Intersection | no i2:Intersection |i1.distance[i2] < 0
+}
+
+assert fin {
+	some t:Temps | all d:Drone | {
+		d.position.t = Entrepot.position
+		d.commande.destination.t.position = Entrepot.position
+	}
 }
 
 

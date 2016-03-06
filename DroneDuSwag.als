@@ -127,21 +127,28 @@ fact ListeReceptacleAjoutTousAccessibles{
 	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
 	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
 }
-fact ListeReceptaclePasDeDoublons{
+fact ListeReceptacleSansDoublons{
 	all r1:Receptacle | ! hasDups[r1.listeRecep]
 }
 
+fact CheminSansDoublons{
+//	all d: Drone | ! hasDups[d.chemin]
+	all d: Drone | # elems[d.chemin] = # inds[d.chemin]
+}
 
-/*
-// détermination du nombre d'instances
-fact NombreInstances {
-	#Drone <= 3
-	#Receptacle <= 3
-	#EnsembleProduits <= 3
-	#Commande <= 3
-	#Intersection <= 8
-}*/
+fact PremierDuChemin{
+	all d:Drone | some r: Receptacle | first[d.chemin]= r && distance[Entrepot.position, r.position] <= 3
+}
+fact DernierDuChemin{
+	all d:Drone | last[d.chemin]= d.commande.destination
+}
+fact CommandeUnSeulDrone{
+	all disj d,d2:Drone | d.commande != d2.commande
+}
 
+fact testCheminPlusLong{
+	all d : Drone | # inds[d.chemin] = 2
+}
 
 /***************************************
 										Pred
@@ -153,14 +160,11 @@ pred simuler {
 
 pred initialiser {
 	all d:Drone | d.batterie = 3
-	all d:Drone | calculerChemin[d, d.commande.destination]
+	all d:Drone | calculerChemin[d]
 }
 
-pred calculerChemin[d:Drone, r2:Receptacle] {
-	one chemin : seq Receptacle | one r1:Receptacle |
-		distance[Entrepot.position, r.position] <= 3
-		&& first[chemin]= r1 && last[chemin]=r2
-	all r : Receptacle | r in d.chemin.elems && last[d.chemin] != r//est pas dernier elem
+pred calculerChemin[d:Drone] {
+	all r : Receptacle | r in d.chemin.elems && last[d.chemin] != r //est pas dernier elem
 		=> r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
 }
 

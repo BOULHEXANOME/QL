@@ -1,4 +1,6 @@
 open util/integer
+open util/ordering[Temps]
+
 /***************************************
 										Let
 ***************************************/
@@ -12,20 +14,19 @@ let RCAP = 10
 ***************************************/
 
 some sig Drone {
-	position: one Intersection,
+	position: Intersection one -> Temps,
 	commande: lone Commande,
-	batterie: Int,
-	chemin : seq Receptacle
+	batterie: Int one->Temps,
+	chemin : seq Receptacle -> Temps
 }
 
-one sig Temps {
-	tempsActuel:Int
-}
+sig Temps {}
 
 some sig Receptacle {
 	position: one Intersection,
+	distances : seq Int,
 	listeRecep : seq Receptacle,
-	contenu : Int
+	contenu : Int one -> Temps
 }
 
 one sig Entrepot {
@@ -38,13 +39,13 @@ sig EnsembleProduits {
 }
 
 some sig Commande {
-	destination: one Receptacle,
-	ensembleProd: lone EnsembleProduits // On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
+	destination: Receptacle one-> Temps,
+	ensembleProd: EnsembleProduits lone-> Temps// On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
 }
 
 sig Intersection {
-	x : Int,
-	y : Int
+	X : Int,
+	Y : Int
 }
 
 
@@ -53,24 +54,21 @@ sig Intersection {
 ***************************************/
 
 // la batterie du drone est entre 0 et 3
-fact BatterieDrone {
-	all d:Drone | d.batterie >= 0 && d.batterie <= 3
-}
-
-// les drones ont une capacité max de DCAP
-fact CapaciteDrone {
-	all d: Drone | d.commande.ensembleProd.contenu <= DCAP && d.commande.ensembleProd.contenu > 0
+fact DroneContraintes {
+	all d:Drone, t:Temps | d.batterie.t >= 0 && d.batterie.t < 4 //Bornes de la batterie
+	all d: Drone, t:Temps | d.commande.ensembleProd.t.contenu <= DCAP && d.commande.ensembleProd.t.contenu > 0
+	
 }
 
 // les réceptacles ont une capacité max de RCAP
 fact CapaciteReceptacle {
-	all r: Receptacle | r.contenu <= RCAP
+	all r: Receptacle, t:Temps | r.contenu.t <= RCAP && r.contenu.t >= 0
 }
 
 
 // Ensemble de Produits appartient à une commande
 fact EnsembleProdDansCommande {
-	all e:EnsembleProduits | some c:Commande | c.ensembleProd = e
+	all e:EnsembleProduits, t:Temps | some c:Commande | c.ensembleProd.t = e
 }
 
 // L'entrepôt a une liste de toutes les commandes
@@ -80,7 +78,7 @@ fact EntrepotListeCommande {
 
 // Si la commande contient un ensemble de prod, alors elle ne peut pas être livrée à l'entrepôt
 fact PasLivraisonEntrepot {
-	all c:Commande | one c.ensembleProd => c.destination.position != Entrepot.position
+	all c:Commande,t:Temps| one c.ensembleProd => c.destination.t.position != Entrepot.position
 }
 
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
@@ -91,7 +89,7 @@ fact EntrepotAUnVoisin {
 
 // Il n'existe pas 2 intersectiones identiques
 fact IntersectionUnitaire {
-	all disj i1,i2: Intersection | i1.x != i2.x || i1.y != i2.y
+	all disj i1,i2: Intersection | i1.X != i2.X || i1.Y != i2.Y
 }
 
 // Il n'existe pas des intersections avec 2 receptacles
@@ -107,30 +105,19 @@ fact EntrepotPasSurReceptacle {
 
 // taille de la grille
 fact LimitationPositions {
-	all i:Intersection | i.x <=6 && i.x >= 0 && i.y <= 6 && i.y >= 0
+	all i:Intersection | i.X <=6 && i.X >= 0 && i.Y <= 6 && i.Y >= 0
 }
 
-fact ReceptacleNePeutPasAllerVersLuiMeme {
+fact NonLuiMeme {
 	all r:Receptacle | r not in r.listeRecep.elems
 }
 
-
-// Remplissage liste des receptacles accessibles
-fact ListeReceptacleAuMoins1Accessible {
-	all r1:Receptacle | some r2:Receptacle | 	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
+fact ListeReceptacle {
+	all r1:Receptacle | some r2:Receptacle | distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0 =>
+	r2 in elems[r1.listeRecep]
+	all r1:Receptacle | some r2:Receptacle | distance[r1.position,r2.position] in elems[r1.distances]	
+	//r1.listeRecep = r1.listeRecep.add[r2] 
 }
-fact ListeReceptacleContraintesDistance{
-	no r1:Receptacle | some r3:Receptacle | (distance[r1.position, r3.position] > 3 || distance[r1.position, r3.position]<=0) &&
-	r3 in elems[r1.listeRecep]
-}
-fact ListeReceptacleAjoutTousAccessibles{
-	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
-	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
-}
-fact ListeReceptaclePasDeDoublons{
-	all r1:Receptacle | ! hasDups[r1.listeRecep]
-}
-
 
 /*
 // détermination du nombre d'instances
@@ -147,23 +134,60 @@ fact NombreInstances {
 										Pred
 ***************************************/
 
-pred simuler {
-	initialiser
-}
-
 pred initialiser {
-	all d:Drone | d.batterie = 3
-	all d:Drone | calculerChemin[d, d.commande.destination]
+	all d:Drone | d.batterie.first = 3
+	all d:Drone | d.position.first = Entrepot.position
+	all c:Commande | c.destination.first.position = Entrepot.position
+	
+	all c:Commande | c.ensembleProd.first.contenu > 0
+	all d:Drone | no r:seq Receptacle |d.chemin.first = r
+
 }
 
-pred calculerChemin[d:Drone, r2:Receptacle] {
-	one chemin : seq Receptacle | one r1:Receptacle |
-		distance[Entrepot.position, r.position] <= 3
-		&& first[chemin]= r1 && last[chemin]=r2
-	all r : Receptacle | r in d.chemin.elems && last[d.chemin] != r//est pas dernier elem
-		=> r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+pred remplirListeReceptaclesAccessibles {
 }
 
+pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
+	i = Entrepot.position //L'entrepôt est toujours disponible
+	||
+	all d:Drone - d'| d.position.t' != i
+}
+
+pred go {
+
+	initialiser
+	all t:Temps - last |let t'=t.next |
+	{
+		all d:Drone | moveDrone[t,t',d]
+	}
+}
+
+pred moveDrone[t,t':Temps, d:Drone]{
+
+	//majBatterie
+	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
+	d.position.t' = d.position.t => d.batterie.t' = d.batterie.t else//immobile
+	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
+	*/
+	
+	d.position.t = d.commande.destination.t.position => {//Le drone est a destination
+
+
+		d.position.t = Entrepot.position => { //entrepot destination
+			
+		} else { // réceptacle destination
+			d.commande.destination.t.contenu.t' = (d.commande.destination.t.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
+			d.commande.ensembleProd.t.contenu = 0
+			d.commande.destination.t'.position = Entrepot.position
+			d.position.t' = d.position.t => d.batterie.t' = d.batterie.t//immobile
+		}
+	}else{//Le drone n'est pas à destination
+			intersectionVide[t,t',d,d.chemin.t.first.position] => { //Si on peut bouger, on le fait
+			d.position.t' = d.chemin.t.first.position//on déplace le drone
+			d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
+		}
+	}
+}
 
 /***************************************
 										Fun
@@ -176,23 +200,36 @@ fun abs[x: Int] : Int {
 
 // calcule la distance entre deux intersections
 fun distance[i1,i2: Intersection]: Int {
-    abs[abs[i1.x.sub[i2.x]].add[abs[i1.y.sub[i2.y]]]]
+//    abs[abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]]
+	i1.X.sub[i2.X].add[i1.Y.sub[i2.Y]]
 }
  
 /***************************************
 										Run
 ***************************************/
 
-run initialiser for exactly 2 Drone, exactly 4 Receptacle, 1 EnsembleProduits, exactly 2 Commande, 6 Intersection, 6 int
+check fin for 1 Drone, exactly 1 Receptacle, 1 EnsembleProduits, 1 Commande, 2 Intersection, 6 int, 10 Temps
 
 /***************************************
 										Assert
 ***************************************/
+
+assert positive {
+	no x:Int | x.abs < 0
+	all i1:Intersection | no i2:Intersection |i1.distance[i2] < 0
+}
+
+assert fin {
+	some t:Temps | all d:Drone | {
+		d.position.t = Entrepot.position
+		d.commande.destination.t.position = Entrepot.position
+	}
+}
 
 
 
 /***************************************
 										Check
 ***************************************/
-
+check positive
 

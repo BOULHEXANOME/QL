@@ -146,6 +146,9 @@ fact CheminSansDoublons{
 fact PremierDuChemin{
 	all d:Drone | first[d.chemin]= Entrepot
 }
+fact SecondDuChemin{
+	all d:Drone | some r: Receptacle | (distance[r.position, Entrepot.position] > 0 && distance[r.position, Entrepot.position] <= 3) => d.chemin[1]=r
+}
 fact DernierDuChemin{
 	all d:Drone | last[d.chemin]= d.commande.destination
 }

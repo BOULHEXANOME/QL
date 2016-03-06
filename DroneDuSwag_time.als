@@ -82,7 +82,7 @@ fact EntrepotPasSurReceptacle {
 
 // taille de la grille
 fact LimitationPositions {
-	all i:Intersection | i.X <=6 && i.X >= 0 && i.Y <= 6 && i.Y >= 0
+	all i:Intersection | i.X <=9 && i.X >= 0 && i.Y <= 9 && i.Y >= 0
 }
 
 fact NonLuiMeme {
@@ -201,7 +201,7 @@ fun distance[i1,i2: Intersection]: Int {
 /***************************************
 										Run
 ***************************************/
-run go for 1 Drone, exactly 2 Receptacle, 1 Commande, 3 Intersection, 7 int, 10 Temps
+run go for 1 Drone, exactly 2 Receptacle, 1 Commande,  4 Intersection, 7 int, 10 Temps
 
 /***************************************
 										Assert

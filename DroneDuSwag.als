@@ -22,7 +22,7 @@ one sig Temps {
 	tempsActuel:Int
 }
 
-sig PositionCible {
+abstract sig PositionCible{
 	position: one Intersection,
 }
 
@@ -109,7 +109,7 @@ fact EntrepotPasSurReceptacle {
 
 // taille de la grille
 fact LimitationPositions {
-	all i:Intersection | i.x <=6 && i.x >= 0 && i.y <= 6 && i.y >= 0
+	all i:Intersection | i.x <=9 && i.x >= 0 && i.y <=9 && i.y >= 0
 }
 
 fact ReceptacleNePeutPasAllerVersLuiMeme {
@@ -132,6 +132,10 @@ fact ListeReceptacleAjoutTousAccessibles{
 fact ListeReceptacleSansDoublons{
 	all r1:Receptacle | ! hasDups[r1.listeRecep]
 }
+/*
+fact TousReceptaclesAccessibles{
+	all disj r1,r2: Receptacle | calculerCheminEntreDeuxReceptacles[r1,r2]
+}*/
 
 fact CheminSansDoublons{
 //	all d: Drone | ! hasDups[d.chemin]
@@ -140,10 +144,6 @@ fact CheminSansDoublons{
 fact PremierDuChemin{
 	all d:Drone | first[d.chemin]= Entrepot
 }
-/*
-fact DeuxiemeDuChemin{
-	all d:Drone | some r: Receptacle | d.chemin[1]=r && distance[Entrepot.position, r.position] <= 3
-}*/
 fact DernierDuChemin{
 	all d:Drone | last[d.chemin]= d.commande.destination
 }
@@ -151,9 +151,10 @@ fact CommandeUnSeulDrone{
 	all disj d,d2:Drone | d.commande != d2.commande
 }
 
-fact testCheminPlusLong{
-	all d : Drone | # inds[d.chemin] = 3
+fact TestCheminPlusLong{
+	all d: Drone | # inds[d.chemin] > 3
 }
+
 /***************************************
 										Pred
 ***************************************/
@@ -168,9 +169,16 @@ pred initialiser {
 }
 
 pred calculerChemin[d:Drone] {
-	all r : Receptacle | r in d.chemin.elems && last[d.chemin] != r //est pas dernier elem
-		=> r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+	all r : Receptacle |
+		last[d.chemin] != r && r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+		=> r in d.chemin.elems
 }
+/*
+pred calculerCheminEntreDeuxReceptacles[r1, r2: Receptacle] {
+	 some chemin: seq Receptacle | some r : Receptacle |
+		r in chemin.elems && last[chemin] != r && last[chemin] = r1 && first[chemin] = r2 =>
+ 		r in chemin[idxOf[chemin,r]+1].listeRecep.elems 
+}*/
 
 
 /***************************************
@@ -186,12 +194,12 @@ fun abs[x: Int] : Int {
 fun distance[i1,i2: Intersection]: Int {
     abs[abs[i1.x.sub[i2.x]].add[abs[i1.y.sub[i2.y]]]]
 }
- 
+
 /***************************************
 										Run
 ***************************************/
 
-run initialiser for exactly 2 Drone, exactly 5 Receptacle, 1 EnsembleProduits, exactly 2 Commande, 7 Intersection, 6 int, 10 PositionCible
+run initialiser for exactly 1 Drone, exactly 7 Receptacle, 1 EnsembleProduits, exactly 1 Commande, 20 Intersection, 6 int, 10 PositionCible
 
 /***************************************
 										Assert

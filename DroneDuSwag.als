@@ -15,21 +15,23 @@ some sig Drone {
 	position: one Intersection,
 	commande: lone Commande,
 	batterie: Int,
-	chemin : seq Receptacle
+	chemin : seq PositionCible
 }
 
 one sig Temps {
 	tempsActuel:Int
 }
 
-some sig Receptacle {
+sig PositionCible {
 	position: one Intersection,
+}
+
+some sig Receptacle extends PositionCible{
 	listeRecep : seq Receptacle,
 	contenu : Int
 }
 
-one sig Entrepot {
-	position: one Intersection,
+one sig Entrepot extends PositionCible{
 	ensembleCommandes: set Commande
 }
 
@@ -38,7 +40,7 @@ sig EnsembleProduits {
 }
 
 some sig Commande {
-	destination: one Receptacle,
+	destination: one PositionCible,
 	ensembleProd: lone EnsembleProduits // On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
 }
 
@@ -135,10 +137,13 @@ fact CheminSansDoublons{
 //	all d: Drone | ! hasDups[d.chemin]
 	all d: Drone | # elems[d.chemin] = # inds[d.chemin]
 }
-
 fact PremierDuChemin{
-	all d:Drone | some r: Receptacle | first[d.chemin]= r && distance[Entrepot.position, r.position] <= 3
+	all d:Drone | first[d.chemin]= Entrepot
 }
+/*
+fact DeuxiemeDuChemin{
+	all d:Drone | some r: Receptacle | d.chemin[1]=r && distance[Entrepot.position, r.position] <= 3
+}*/
 fact DernierDuChemin{
 	all d:Drone | last[d.chemin]= d.commande.destination
 }
@@ -147,9 +152,8 @@ fact CommandeUnSeulDrone{
 }
 
 fact testCheminPlusLong{
-	all d : Drone | # inds[d.chemin] = 2
+	all d : Drone | # inds[d.chemin] = 3
 }
-
 /***************************************
 										Pred
 ***************************************/
@@ -187,7 +191,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run initialiser for exactly 2 Drone, exactly 4 Receptacle, 1 EnsembleProduits, exactly 2 Commande, 6 Intersection, 6 int
+run initialiser for exactly 2 Drone, exactly 5 Receptacle, 1 EnsembleProduits, exactly 2 Commande, 7 Intersection, 6 int, 10 PositionCible
 
 /***************************************
 										Assert

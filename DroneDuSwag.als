@@ -15,9 +15,9 @@ let RCAP = 10
 
 some sig Drone {
 	position: Intersection one -> Temps,
-	commande: lone Commande,
+	commande: one Commande,
 	batterie: Int one->Temps,
-	chemin : seq Receptacle
+	chemin : seq Receptacle->Temps
 }
 
 sig Temps {}
@@ -31,23 +31,18 @@ some sig Receptacle {
 
 one sig Entrepot {
 	position: one Intersection,
-	ensembleCommandes: set Commande
 }
 
-sig EnsembleProduits {
-	contenu: Int
-}
 
 some sig Commande {
-	destination: one Receptacle,
-	ensembleProd: EnsembleProduits lone-> Temps// On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
+	destination: Receptacle one->Temps,
+	contenu: Int one->Temps// On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
 }
 
 sig Intersection {
 	X : Int,
 	Y : Int
 }
-
 
 /***************************************
 										Fact
@@ -56,8 +51,7 @@ sig Intersection {
 // la batterie du drone est entre 0 et 3
 fact DroneContraintes {
 	all d:Drone, t:Temps | d.batterie.t >= 0 && d.batterie.t < 4 //Bornes de la batterie
-	all d: Drone, t:Temps | d.commande.ensembleProd.t.contenu <= DCAP && d.commande.ensembleProd.t.contenu > 0
-	
+	all d: Drone, t:Temps | d.commande.contenu.t<= DCAP && d.commande.contenu.t>= 0
 }
 
 // les réceptacles ont une capacité max de RCAP
@@ -65,26 +59,10 @@ fact CapaciteReceptacle {
 	all r: Receptacle, t:Temps | r.contenu.t <= RCAP && r.contenu.t >= 0
 }
 
-// Ensemble de Produits appartient à une commande
-fact EnsembleProdDansCommande {
-	all e:EnsembleProduits, t:Temps | some c:Commande | c.ensembleProd.t = e
-}
-
-// L'entrepôt a une liste de toutes les commandes
-fact EntrepotListeCommande {
-	all c:Commande | some e:Entrepot | c in e.ensembleCommandes
-}
-
-// Si la commande contient un ensemble de prod, alors elle ne peut pas être livrée à l'entrepôt
-fact PasLivraisonEntrepot {
-	all c:Commande| one c.ensembleProd => c.destination.position != Entrepot.position
-}
-
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
 fact EntrepotAUnVoisin {
 	some r:Receptacle | distance[r.position, Entrepot.position] = 1
 }
-
 
 // Il n'existe pas 2 intersectiones identiques
 fact IntersectionUnitaire {
@@ -104,7 +82,7 @@ fact EntrepotPasSurReceptacle {
 
 // taille de la grille
 fact LimitationPositions {
-	all i:Intersection | i.X <=6 && i.X >= 0 && i.Y <= 6 && i.Y >= 0
+	all i:Intersection | i.X <=9 && i.X >= 0 && i.Y <= 9 && i.Y >= 0
 }
 
 fact NonLuiMeme {
@@ -129,32 +107,32 @@ fact ListeReceptacleSansDoublons{
 
 fact CheminSansDoublons{
 //	all d: Drone | ! hasDups[d.chemin]
-	all d: Drone | # elems[d.chemin] = # inds[d.chemin]
+	all d: Drone, t:Temps | # elems[d.chemin.t] = # inds[d.chemin.t]
 }
 
 fact PremierDuChemin{
-	all d:Drone | some r: Receptacle | first[d.chemin]= r && distance[Entrepot.position, r.position] <= 3
+	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => (first[d.chemin.t]= r && distance[Entrepot.position, r.position] <= 3)
 }
 fact DernierDuChemin{
-	all d:Drone | last[d.chemin]= d.commande.destination
+	all d:Drone, t:Temps | !d.chemin.t.isEmpty => (last[d.chemin.t]= d.commande.destination.t)
 }
 fact CommandeUnSeulDrone{
 	all disj d,d2:Drone | d.commande != d2.commande
 }
 
-fact testCheminPlusLong{
-	all d : Drone | # inds[d.chemin] = 2
-}
+fact {go}
 
 /***************************************
 										Pred
 ***************************************/
 
 pred initialiser {
-	all d:Drone | d.batterie.first = 3
-	all d:Drone | d.position.first = Entrepot.position
-	all d:Drone | no c:Commande | d.commande = c
-	all c:Commande | c.ensembleProd.first.contenu > 0
+	all d:Drone | {
+		d.batterie.first = 3
+		d.position.first = Entrepot.position
+		d.commande.contenu.first = 0
+		d.chemin.first.isEmpty
+	}
 }
 
 pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
@@ -164,8 +142,8 @@ pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
 }
 
 pred calculerChemin[d:Drone] {
-	all r : Receptacle | r in d.chemin.elems && last[d.chemin] != r //est pas dernier elem
-		=> r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+	all r : Receptacle | r in d.chemin.first.elems && last[d.chemin.first] != r //est pas dernier elem
+		=> r in d.chemin.first[idxOf[d.chemin.first,r]+1].listeRecep.elems
 }
 
 pred go {
@@ -177,6 +155,10 @@ pred go {
 }
 
 pred moveDrone[t,t':Temps, d:Drone]{
+
+	d.batterie.t' = d.batterie.t
+	d.position.t' = d.position.t
+	d.chemin.t' = d.chemin.t
 	
 	//majBatterie
 	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
@@ -212,15 +194,13 @@ fun abs[x: Int] : Int {
 
 // calcule la distance entre deux intersections
 fun distance[i1,i2: Intersection]: Int {
-//    abs[abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]]
-	i1.X.sub[i2.X].add[i1.Y.sub[i2.Y]]
+    abs[abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]]
 }
  
 /***************************************
 										Run
 ***************************************/
-
-check fin for 1 Drone, exactly 2 Receptacle, 1 EnsembleProduits, 1 Commande, 3 Intersection, 6 int, 10 Temps
+run go for 1 Drone, exactly 2 Receptacle, 1 Commande,  4 Intersection, 7 int, 10 Temps
 
 /***************************************
 										Assert
@@ -231,12 +211,12 @@ assert positive {
 	all i1:Intersection | no i2:Intersection |i1.distance[i2] < 0
 }
 
-assert fin {
+/*assert fin {
 	some t:Temps | all d:Drone, c:Commande | {
 		d.position.t = Entrepot.position
-		c.ensembleProd.t.contenu = 0
+		c.contenu.t = 5
 	}
-}
+}*/
 
 
 
@@ -244,4 +224,3 @@ assert fin {
 										Check
 ***************************************/
 check positive
-

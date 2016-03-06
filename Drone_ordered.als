@@ -1,59 +1,56 @@
 open util/integer
-open util/ordering[State]
+open util/ordering[Time]
 
 /***************************************
 										Sig
 ***************************************/
 
 some sig Drone {
-	Batterie:Int
+	Batterie:Int one -> Time
 }
 
-sig State {charged, done : set Drone}
+sig Time {}
 
 /***************************************
 										Fact
 ***************************************/
 
-fact {first.charged = Drone && no first.done
-		all x : first.charged | x.Batterie = 0}
-
 fact {
-	all s: State, s' : s.next{
-		moveDrone[s.charged, s'.charged, s.done, s'.done]
-	}
+	all x : Drone | x.Batterie.first = 3
+
 }
+
 
 /***************************************
 										Pred
 ***************************************/
 
-pred moveDrone[from, from', to, to': set Drone]{
-	all x: from | {
-		x.Batterie.pos => {from' = from + x.reduceBatterie
-										to' = to} 
-		x.Batterie = 0 => {from' = from - x
-									   to' = to + x }
-	}
+pred moveDrone[t,t' : Time, d:Drone]{
+	d.Batterie.t > 0 => d.Batterie.t' = d.Batterie.t.sub[1]
+}
+
+pred simul {
+	all t:Time - last | let t' = t.next | { all d:Drone | moveDrone[t,t',d] }
 }
 
 /***************************************
 										Fun
 ***************************************/
 
-fun reduceBatterie[x:Drone] : Drone{
-	{y : Drone | y.Batterie=x.Batterie.sub[1]}
-}
-
 /***************************************
 										Run
 ***************************************/
-run {last.done = Drone}
 
 /***************************************
 										Assert
 ***************************************/
 
+assert fin{
+	all d:Drone | some t:Time | d.Batterie.t = 0
+}
+
 /***************************************
 										Check
 ***************************************/
+
+run simul for exactly 2 Drone, 3 Time

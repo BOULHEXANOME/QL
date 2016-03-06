@@ -85,11 +85,7 @@ fact PasLivraisonEntrepot {
 
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
 fact EntrepotAUnVoisin {
-	some r:Receptacle | 
-	((r.position.x = Entrepot.position.x.add[1] || r.position.x = Entrepot.position.x.sub[1]) && (r.position.y = Entrepot.position.y))
-	||
-	((r.position.x = Entrepot.position.x) && (r.position.y = Entrepot.position.y.add[1] || r.position.y = Entrepot.position.y.sub[1]))
-	&& (all d:Drone  | first[d.chemin] = r)
+	some r:Receptacle | distance[r.position, Entrepot.position] = 1
 }
 
 
@@ -153,30 +149,20 @@ fact NombreInstances {
 
 pred simuler {
 	initialiser
-	//iterer
 }
 
 pred initialiser {
 	all d:Drone | d.batterie = 3
-	//all d:Drone | calculerChemin[d, d.commande.destination]
+	all d:Drone | calculerChemin[d, d.commande.destination]
 }
 
-/*pred trouverPremierReceptacle[d: Drone] {
-	one r:Receptacle | distance[Entrepot.position, r.position] = 1 <=> first[d.chemin] = r
-}*/
-fun trouverPremierReceptacle : Receptacle{
-	{r:Receptacle | distance[Entrepot.position, r.position] = 1}
-}
-
-pred remplirListeReceptaclesAccessibles {
-}
-/*
 pred calculerChemin[d:Drone, r2:Receptacle] {
-	one r1 :Receptacle= trouverPremierReceptacle|
-	one chemin : seq Receptacle |  first[chemin]=r1 && last[chemin]=r2
+	one chemin : seq Receptacle | one r1:Receptacle |
+		distance[Entrepot.position, r.position] <= 3
+		&& first[chemin]= r1 && last[chemin]=r2
 	all r : Receptacle | r in d.chemin.elems && last[d.chemin] != r//est pas dernier elem
-	=> r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
-}*/
+		=> r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+}
 
 
 /***************************************

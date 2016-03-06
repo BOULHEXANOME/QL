@@ -17,7 +17,7 @@ some sig Drone {
 	position: Intersection one -> Temps,
 	commande: lone Commande,
 	batterie: Int one->Temps,
-	chemin : seq Receptacle -> Temps
+	chemin : seq Receptacle
 }
 
 sig Temps {}
@@ -39,7 +39,7 @@ sig EnsembleProduits {
 }
 
 some sig Commande {
-	destination: Receptacle one-> Temps,
+	destination: one Receptacle,
 	ensembleProd: EnsembleProduits lone-> Temps// On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
 }
 
@@ -65,7 +65,6 @@ fact CapaciteReceptacle {
 	all r: Receptacle, t:Temps | r.contenu.t <= RCAP && r.contenu.t >= 0
 }
 
-
 // Ensemble de Produits appartient à une commande
 fact EnsembleProdDansCommande {
 	all e:EnsembleProduits, t:Temps | some c:Commande | c.ensembleProd.t = e
@@ -78,7 +77,7 @@ fact EntrepotListeCommande {
 
 // Si la commande contient un ensemble de prod, alors elle ne peut pas être livrée à l'entrepôt
 fact PasLivraisonEntrepot {
-	all c:Commande,t:Temps| one c.ensembleProd => c.destination.t.position != Entrepot.position
+	all c:Commande| one c.ensembleProd => c.destination.position != Entrepot.position
 }
 
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
@@ -112,23 +111,40 @@ fact NonLuiMeme {
 	all r:Receptacle | r not in r.listeRecep.elems
 }
 
-fact ListeReceptacle {
-	all r1:Receptacle | some r2:Receptacle | distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0 =>
-	r2 in elems[r1.listeRecep]
-	all r1:Receptacle | some r2:Receptacle | distance[r1.position,r2.position] in elems[r1.distances]	
-	//r1.listeRecep = r1.listeRecep.add[r2] 
+// Remplissage liste des receptacles accessibles
+fact ListeReceptacleAuMoins1Accessible {
+	all r1:Receptacle | some r2:Receptacle | 	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
+}
+fact ListeReceptacleContraintesDistance{
+	no r1:Receptacle | some r3:Receptacle | (distance[r1.position, r3.position] > 3 || distance[r1.position, r3.position]<=0) &&
+	r3 in elems[r1.listeRecep]
+}
+fact ListeReceptacleAjoutTousAccessibles{
+	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
+	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
+}
+fact ListeReceptacleSansDoublons{
+	all r1:Receptacle | ! hasDups[r1.listeRecep]
 }
 
-/*
-// détermination du nombre d'instances
-fact NombreInstances {
-	#Drone <= 3
-	#Receptacle <= 3
-	#EnsembleProduits <= 3
-	#Commande <= 3
-	#Intersection <= 8
-}*/
+fact CheminSansDoublons{
+//	all d: Drone | ! hasDups[d.chemin]
+	all d: Drone | # elems[d.chemin] = # inds[d.chemin]
+}
 
+fact PremierDuChemin{
+	all d:Drone | some r: Receptacle | first[d.chemin]= r && distance[Entrepot.position, r.position] <= 3
+}
+fact DernierDuChemin{
+	all d:Drone | last[d.chemin]= d.commande.destination
+}
+fact CommandeUnSeulDrone{
+	all disj d,d2:Drone | d.commande != d2.commande
+}
+
+fact testCheminPlusLong{
+	all d : Drone | # inds[d.chemin] = 2
+}
 
 /***************************************
 										Pred
@@ -137,14 +153,8 @@ fact NombreInstances {
 pred initialiser {
 	all d:Drone | d.batterie.first = 3
 	all d:Drone | d.position.first = Entrepot.position
-	all c:Commande | c.destination.first.position = Entrepot.position
-	
+	all d:Drone | no c:Commande | d.commande = c
 	all c:Commande | c.ensembleProd.first.contenu > 0
-	all d:Drone | no r:seq Receptacle |d.chemin.first = r
-
-}
-
-pred remplirListeReceptaclesAccessibles {
 }
 
 pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
@@ -153,8 +163,12 @@ pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
 	all d:Drone - d'| d.position.t' != i
 }
 
-pred go {
+pred calculerChemin[d:Drone] {
+	all r : Receptacle | r in d.chemin.elems && last[d.chemin] != r //est pas dernier elem
+		=> r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+}
 
+pred go {
 	initialiser
 	all t:Temps - last |let t'=t.next |
 	{
@@ -163,30 +177,28 @@ pred go {
 }
 
 pred moveDrone[t,t':Temps, d:Drone]{
-
+	
 	//majBatterie
 	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
 	d.position.t' = d.position.t => d.batterie.t' = d.batterie.t else//immobile
 	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 	*/
-	
-	d.position.t = d.commande.destination.t.position => {//Le drone est a destination
-
-
+	/*
+	d.position.t = d.commande.destination.position => {//Le drone est a destination
 		d.position.t = Entrepot.position => { //entrepot destination
 			
 		} else { // réceptacle destination
-			d.commande.destination.t.contenu.t' = (d.commande.destination.t.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
+			d.commande.destination.contenu.t' = (d.commande.destination.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
 			d.commande.ensembleProd.t.contenu = 0
-			d.commande.destination.t'.position = Entrepot.position
 			d.position.t' = d.position.t => d.batterie.t' = d.batterie.t//immobile
 		}
 	}else{//Le drone n'est pas à destination
-			intersectionVide[t,t',d,d.chemin.t.first.position] => { //Si on peut bouger, on le fait
-			d.position.t' = d.chemin.t.first.position//on déplace le drone
-			d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
+		intersectionVide[t,t',d,d.chemin.first.position] => { //Si on peut bouger, on le fait
+		d.position.t' = d.chemin.first.position//on déplace le drone
+		d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 		}
-	}
+	}*/
+
 }
 
 /***************************************
@@ -208,7 +220,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-check fin for 1 Drone, exactly 1 Receptacle, 1 EnsembleProduits, 1 Commande, 2 Intersection, 6 int, 10 Temps
+check fin for 1 Drone, exactly 2 Receptacle, 1 EnsembleProduits, 1 Commande, 3 Intersection, 6 int, 10 Temps
 
 /***************************************
 										Assert
@@ -220,9 +232,9 @@ assert positive {
 }
 
 assert fin {
-	some t:Temps | all d:Drone | {
+	some t:Temps | all d:Drone, c:Commande | {
 		d.position.t = Entrepot.position
-		d.commande.destination.t.position = Entrepot.position
+		c.ensembleProd.t.contenu = 0
 	}
 }
 

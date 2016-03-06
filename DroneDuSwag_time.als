@@ -15,9 +15,9 @@ let RCAP = 10
 
 some sig Drone {
 	position: Intersection one -> Temps,
-	commande: lone Commande,
+	commande: one Commande,
 	batterie: Int one->Temps,
-	chemin : seq Receptacle -> Temps
+	chemin : seq Receptacle->Temps
 }
 
 sig Temps {}
@@ -31,16 +31,12 @@ some sig Receptacle {
 
 one sig Entrepot {
 	position: one Intersection,
-	ensembleCommandes: set Commande
 }
 
-sig EnsembleProduits {
-	contenu: Int
-}
 
 some sig Commande {
-	destination: Receptacle one-> Temps,
-	ensembleProd: EnsembleProduits lone-> Temps// On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
+	destination: Receptacle one->Temps,
+	contenu: Int one->Temps// On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
 }
 
 sig Intersection {
@@ -48,16 +44,14 @@ sig Intersection {
 	Y : Int
 }
 
-
 /***************************************
 										Fact
 ***************************************/
 
 // la batterie du drone est entre 0 et 3
 fact DroneContraintes {
-	all d:Drone, t:Temps | d.batterie.t >= 0 && d.batterie.t <= 3 //Bornes de la batterie
-	all d: Drone, t:Temps | d.commande.ensembleProd.t.contenu <= DCAP && d.commande.ensembleProd.t.contenu > 0
-	
+	all d:Drone, t:Temps | d.batterie.t >= 0 && d.batterie.t < 4 //Bornes de la batterie
+	all d: Drone, t:Temps | d.commande.contenu.t<= DCAP && d.commande.contenu.t>= 0
 }
 
 // les réceptacles ont une capacité max de RCAP
@@ -65,30 +59,10 @@ fact CapaciteReceptacle {
 	all r: Receptacle, t:Temps | r.contenu.t <= RCAP && r.contenu.t >= 0
 }
 
-
-// Ensemble de Produits appartient à une commande
-fact EnsembleProdDansCommande {
-	all e:EnsembleProduits, t:Temps | some c:Commande | c.ensembleProd.t = e
-}
-
-// L'entrepôt a une liste de toutes les commandes
-fact EntrepotListeCommande {
-	all c:Commande | some e:Entrepot | c in e.ensembleCommandes
-}
-
-// Si la commande contient un ensemble de prod, alors elle ne peut pas être livrée à l'entrepôt
-fact PasLivraisonEntrepot {
-	all c:Commande,t:Temps| one c.ensembleProd => c.destination.t.position != Entrepot.position
-}
-
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
 fact EntrepotAUnVoisin {
-	some r:Receptacle | 
-	((r.position.X = Entrepot.position.X.add[1] || r.position.X = Entrepot.position.X.sub[1]) && (r.position.Y = Entrepot.position.Y))
-	||
-	((r.position.X = Entrepot.position.X) && (r.position.Y = Entrepot.position.Y.add[1] || r.position.Y = Entrepot.position.Y.sub[1]))
+	some r:Receptacle | distance[r.position, Entrepot.position] = 1
 }
-
 
 // Il n'existe pas 2 intersectiones identiques
 fact IntersectionUnitaire {
@@ -115,41 +89,50 @@ fact NonLuiMeme {
 	all r:Receptacle | r not in r.listeRecep.elems
 }
 
-fact ListeReceptacle {
-	all r1:Receptacle | some r2:Receptacle | distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0 =>
-	r2 in elems[r1.listeRecep]
-	all r1:Receptacle | some r2:Receptacle | distance[r1.position,r2.position] in elems[r1.distances]	
-	//r1.listeRecep = r1.listeRecep.add[r2] 
+// Remplissage liste des receptacles accessibles
+fact ListeReceptacleAuMoins1Accessible {
+	all r1:Receptacle | some r2:Receptacle | 	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
+}
+fact ListeReceptacleContraintesDistance{
+	no r1:Receptacle | some r3:Receptacle | (distance[r1.position, r3.position] > 3 || distance[r1.position, r3.position]<=0) &&
+	r3 in elems[r1.listeRecep]
+}
+fact ListeReceptacleAjoutTousAccessibles{
+	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
+	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
+}
+fact ListeReceptacleSansDoublons{
+	all r1:Receptacle | ! hasDups[r1.listeRecep]
 }
 
-/*
-// détermination du nombre d'instances
-fact NombreInstances {
-	#Drone <= 3
-	#Receptacle <= 3
-	#EnsembleProduits <= 3
-	#Commande <= 3
-	#Intersection <= 8
-}*/
+fact CheminSansDoublons{
+//	all d: Drone | ! hasDups[d.chemin]
+	all d: Drone, t:Temps | # elems[d.chemin.t] = # inds[d.chemin.t]
+}
 
+fact PremierDuChemin{
+	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => (first[d.chemin.t]= r && distance[Entrepot.position, r.position] <= 3)
+}
+fact DernierDuChemin{
+	all d:Drone, t:Temps | !d.chemin.t.isEmpty => (last[d.chemin.t]= d.commande.destination.t)
+}
+fact CommandeUnSeulDrone{
+	all disj d,d2:Drone | d.commande != d2.commande
+}
+
+fact {go}
 
 /***************************************
 										Pred
 ***************************************/
 
 pred initialiser {
-	all d:Drone | d.batterie.first = 3
-	all d:Drone | d.position.first = Entrepot.position
-	all c:Commande | c.destination.first.position = Entrepot.position
-	
-	all c:Commande | c.ensembleProd.first.contenu > 0
-	all d:Drone | no r:seq Receptacle |d.chemin.first = r
-
-	
-	
-}
-
-pred remplirListeReceptaclesAccessibles {
+	all d:Drone | {
+		d.batterie.first = 3
+		d.position.first = Entrepot.position
+		d.commande.contenu.first = 0
+		d.chemin.first.isEmpty
+	}
 }
 
 pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
@@ -158,8 +141,12 @@ pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
 	all d:Drone - d'| d.position.t' != i
 }
 
-pred go {
+pred calculerChemin[d:Drone] {
+	all r : Receptacle | r in d.chemin.first.elems && last[d.chemin.first] != r //est pas dernier elem
+		=> r in d.chemin.first[idxOf[d.chemin.first,r]+1].listeRecep.elems
+}
 
+pred go {
 	initialiser
 	all t:Temps - last |let t'=t.next |
 	{
@@ -169,28 +156,31 @@ pred go {
 
 pred moveDrone[t,t':Temps, d:Drone]{
 
+	d.batterie.t' = d.batterie.t
+	d.position.t' = d.position.t
+	d.chemin.t' = d.chemin.t
+	
 	//majBatterie
 	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
 	d.position.t' = d.position.t => d.batterie.t' = d.batterie.t else//immobile
 	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 	*/
-	
-	d.position.t = d.commande.destination.t.position => {//Le drone est a destination
-
-
+	/*
+	d.position.t = d.commande.destination.position => {//Le drone est a destination
 		d.position.t = Entrepot.position => { //entrepot destination
 			
 		} else { // réceptacle destination
-			d.commande.destination.t.contenu.t' = (d.commande.destination.t.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
+			d.commande.destination.contenu.t' = (d.commande.destination.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
 			d.commande.ensembleProd.t.contenu = 0
-			d.commande.destination.t'.position = Entrepot.position
+			d.position.t' = d.position.t => d.batterie.t' = d.batterie.t//immobile
 		}
 	}else{//Le drone n'est pas à destination
-			intersectionVide[t,t',d,d.chemin.t.first.position] => { //Si on peut bouger, on le fait
-			d.position.t' = d.chemin.t.first.position//on déplace le drone
-			d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
+		intersectionVide[t,t',d,d.chemin.first.position] => { //Si on peut bouger, on le fait
+		d.position.t' = d.chemin.first.position//on déplace le drone
+		d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 		}
-	}
+	}*/
+
 }
 
 /***************************************
@@ -211,8 +201,7 @@ fun distance[i1,i2: Intersection]: Int {
 /***************************************
 										Run
 ***************************************/
-
-check fin for 1 Drone, exactly 1 Receptacle, 1 EnsembleProduits, 1 Commande, 2 Intersection, 6 int, 10 Temps
+run go for 1 Drone, exactly 2 Receptacle, 1 Commande, 3 Intersection, 7 int, 10 Temps
 
 /***************************************
 										Assert
@@ -223,12 +212,12 @@ assert positive {
 	all i1:Intersection | no i2:Intersection |i1.distance[i2] < 0
 }
 
-assert fin {
-	some t:Temps | all d:Drone | {
+/*assert fin {
+	some t:Temps | all d:Drone, c:Commande | {
 		d.position.t = Entrepot.position
-		d.commande.destination.t.position = Entrepot.position
+		c.contenu.t = 5
 	}
-}
+}*/
 
 
 
@@ -236,4 +225,3 @@ assert fin {
 										Check
 ***************************************/
 check positive
-

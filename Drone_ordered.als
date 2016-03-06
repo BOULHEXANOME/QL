@@ -17,8 +17,8 @@ sig Time {}
 
 fact {
 	all x : Drone | x.Batterie.first = 3
-
 }
+
 
 
 /***************************************

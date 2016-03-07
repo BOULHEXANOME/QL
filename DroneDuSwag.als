@@ -165,14 +165,14 @@ pred calculerChemin[d:Drone, t:Temps] {
 
 pred go {
 	initialiser
-	all t:Temps - last |let t'=t.next |
+	all t:Temps - last |let t2=t.next |
 	{
-		all d:Drone | bougerDrone[t,t',d]
-		all c:Commande | bougerCommande[t,t',c]
+		all d:Drone | bougerDrone[t,t2,d]
+		all c:Commande | bougerCommande[t,t2,c]
 	}
 }
 
-pred bougerDrone[t,t':Temps, d:Drone]{
+pred bougerDrone[t,t2:Temps, d:Drone]{
 	
 	//majBatterie
 	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
@@ -180,21 +180,26 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 	*/
 	
-	d.commande.contenu.t = 0 => {//Le contenu est vide
+	// la commande du drone est vide et le drone et à l'entrepot et il reste des commandes à livrer non vide
+	some c:Commande | (d.commande.destination.t2 = c.destination.t)
+		=> (c in Entrepot.ensembleCommandes.t && c.contenu.t > 0 && d.commande.contenu.t = 0 && d.position.t = Entrepot.position)
+	/*d.commande.contenu.t = 0 => {//Le contenu est vide
 		d.position.t = Entrepot.position => { //entrepot
-			some c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes
-				d.commande.destination.t' = c.destination.t
-				d.commande.contenu.t' = c.contenu.t
-				d.batterie.t'=d.batterie.t
-				d.position.t'=d.position.t
+			one c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes
+				d.commande.destination.t' = c.destination.t /*&&
+				d.commande.contenu.t' = c.contenu.t &&
+				d.batterie.t'=d.batterie.t &&
+				d.position.t'=d.position.t &&
 				d.calculerChemin[t']
+			}/*else{
+				d.batterie.t' = 1
 			}
 		} /*else { // réceptacle destination
 			d.commande.destination.contenu.t' = (d.commande.destination.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
 			d.commande.ensembleProd.t.contenu = 0
 			d.position.t' = d.position.t => d.batterie.t' = d.batterie.t//immobile
-		}*/
-	}/*else{//Le drone n'est pas à destination
+		}
+	}else{//Le drone n'est pas à destination
 		intersectionVide[t,t',d,d.chemin.first.position] => { //Si on peut bouger, on le fait
 		d.position.t' = d.chemin.first.position//on déplace le drone
 		d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement

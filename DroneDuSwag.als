@@ -173,6 +173,12 @@ pred go {
 	}
 }
 
+pred intersectionVide[t,t':Temps, d:Drone, i:Intersection]{
+	
+	
+
+}
+
 pred bougerDrone[t,t':Temps, d:Drone]{
 	
 	//majBatterie
@@ -196,23 +202,30 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 				d.position.t'=d.position.t
 				d.chemin.t' = d.chemin.t
 			}
-		} /*else { // réceptacle destination
-			d.commande.destination.contenu.t' = (d.commande.destination.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
-			d.commande.ensembleProd.t.contenu = 0
-			d.position.t' = d.position.t => d.batterie.t' = d.batterie.t//immobile
-		}*/
-	}else{//Le drone n'est pas à destination
+		} else { // réceptacle destination
 				d.commande.destination.t' = d.commande.destination.t
 				d.commande.contenu.t' = d.commande.contenu.t
 				d.batterie.t'=d.batterie.t
 				d.position.t'=d.position.t
 				d.chemin.t' = d.chemin.t
-/*
-		intersectionVide[t,t',d,d.chemin.first.position] => { //Si on peut bouger, on le fait
-		d.position.t' = d.chemin.first.position//on déplace le drone
-		d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
-*/
+		}
+	}else{//Le drone n'est pas à destination
+				d.commande.destination.t' = d.commande.destination.t
+				d.commande.contenu.t' = d.commande.contenu.t
+				d.batterie.t'=d.batterie.t
+				d.chemin.t' = d.chemin.t
+				d.position.t'=d.chemin.t.first.position
+				d.batterie.t' = d.batterie.t.sub[1]
 	}
+}
+
+pred deplacerDrone[d:Drone,t,t':Temps]{
+
+	d.position.t.X < d.chemin.t.first.position.X => { //X n'est pas aligné
+		one i:Intersection | distance[i,d.position.t] <= 3
+	}
+			
+		
 }
 
 /***************************************
@@ -233,7 +246,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run go for 1 Drone, exactly 3 Receptacle, exactly 3 Commande,  6 Intersection, 7 int, exactly 3 Temps
+run go for 1 Drone, exactly 2 Receptacle, exactly 2 Commande,  6 Intersection, 7 int, exactly 5 Temps
 
 /***************************************
 										Assert

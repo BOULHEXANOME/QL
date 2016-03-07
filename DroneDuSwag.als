@@ -31,7 +31,7 @@ some sig Receptacle extends PositionCible{
 }
 
 one sig Entrepot extends PositionCible{
-	ensembleCommandes: set Commande
+	ensembleCommandes: set Commande -> Temps
 }
 
 
@@ -52,12 +52,19 @@ sig Intersection {
 // la batterie du drone est entre 0 et 3
 fact DroneContraintes {
 	all d:Drone, t:Temps | d.batterie.t >= 0 && d.batterie.t < 4 //Bornes de la batterie
-	all d: Drone, t:Temps | d.commande.contenu.t<= DCAP && d.commande.contenu.t>= 0
+}
+
+fact LimitesCommandes {
+	all c:Commande, t:Temps | c.contenu.t<= DCAP && c.contenu.t>= 0
+}
+
+fact CommandesPasSurReceptacle {
+	all c:Commande, t:Temps | c.contenu.t > 0 => c.destination.t != Entrepot
 }
 
 // les réceptacles ont une capacité max de RCAP
 fact CapaciteReceptacle {
-	all r: Receptacle | r.contenu <= RCAP
+	all r: Receptacle | r.contenu <= RCAP && r.contenu >= 0
 }
 
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
@@ -145,6 +152,8 @@ pred initialiser {
 		d.commande.destination.first = Entrepot
 		d.chemin.first.isEmpty
 	}
+	all d:Drone, c:Commande | c.contenu.first = 0 => d.commande = c
+	all c:Commande | c.contenu.first > 0 => c in Entrepot.ensembleCommandes.first
 }
 
 pred calculerChemin[d:Drone, t:Temps] {
@@ -158,11 +167,12 @@ pred go {
 	initialiser
 	all t:Temps - last |let t'=t.next |
 	{
-		all d:Drone | moveDrone[t,t',d]
+		all d:Drone | bougerDrone[t,t',d]
+		all c:Commande | bougerCommande[t,t',c]
 	}
 }
 
-pred moveDrone[t,t':Temps, d:Drone]{
+pred bougerDrone[t,t':Temps, d:Drone]{
 	
 	//majBatterie
 	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
@@ -170,14 +180,15 @@ pred moveDrone[t,t':Temps, d:Drone]{
 	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 	*/
 	
-	d.position.t = d.commande.destination.t.position => {//Le drone est a destination
-		d.position.t = Entrepot.position => { //entrepot destination
-			some c:Commande | c.destination.t != Entrepot => {//il reste des commandes
+	d.commande.contenu.t = 0 => {//Le contenu est vide
+		d.position.t = Entrepot.position => { //entrepot
+			some c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes
 				d.commande.destination.t' = c.destination.t
 				d.commande.contenu.t' = c.contenu.t
+				d.batterie.t'=d.batterie.t
+				d.position.t'=d.position.t
 				d.calculerChemin[t']
 			}
-				
 		} /*else { // réceptacle destination
 			d.commande.destination.contenu.t' = (d.commande.destination.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
 			d.commande.ensembleProd.t.contenu = 0
@@ -190,6 +201,11 @@ pred moveDrone[t,t':Temps, d:Drone]{
 		}
 	}*/
 
+}
+
+pred bougerCommande[t,t':Temps, c:Commande]{
+	c.contenu.t'=c.contenu.t
+	c.destination.t'=c.destination.t
 }
 
 
@@ -211,7 +227,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run go for 1 Drone, exactly 3 Receptacle, 2 Commande,  6 Intersection, 7 int, 10 Temps
+run go for 1 Drone, exactly 3 Receptacle, exactly 3 Commande,  6 Intersection, 7 int, exactly 3 Temps
 
 /***************************************
 										Assert

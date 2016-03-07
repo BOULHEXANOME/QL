@@ -22,11 +22,11 @@ some sig Drone {
 sig Temps {}
 
 abstract sig PositionCible{
-	position: one Intersection,
+	listeRecep : seq Receptacle,
+	position: one Intersection
 }
 
 some sig Receptacle extends PositionCible{
-	listeRecep : seq Receptacle,
 	contenu : Int
 }
 
@@ -106,6 +106,12 @@ fact ListeReceptacleSansDoublons{
 	all r1:Receptacle | ! hasDups[r1.listeRecep]
 }
 
+fact TousReceptaclesAccessibles{
+	all r1,r2: Receptacle | some chemin: seq Receptacle | some r : Receptacle |
+		/*last[chemin] != r && */last[chemin] = r1 && first[chemin] = r2  && r in chemin[idxOf[chemin,r]+1].listeRecep.elems =>
+ 		r in chemin.elems
+}
+
 fact CheminSansDoublons{
 //	all d: Drone | ! hasDups[d.chemin]
 	all d: Drone, t:Temps | # elems[d.chemin.t] = # inds[d.chemin.t]
@@ -113,6 +119,9 @@ fact CheminSansDoublons{
 
 fact PremierDuChemin{
 	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => (first[d.chemin.t]= r && distance[Entrepot.position, r.position] <= 3)
+}
+fact SecondDuChemin{
+	all d:Drone | some r: Receptacle | (distance[r.position, Entrepot.position] > 0 && distance[r.position, Entrepot.position] <= 3) => d.chemin[1]=r
 }
 fact DernierDuChemin{
 	all d:Drone, t:Temps | !d.chemin.t.isEmpty => (last[d.chemin.t]= d.commande.destination.t)
@@ -139,9 +148,10 @@ pred initialiser {
 }
 
 pred calculerChemin[d:Drone] {
-	all r : Receptacle, t:Temps |
-		last[d.chemin.t] != r && r in d.chemin.t[idxOf[d.chemin.t,r]+1].listeRecep.elems
-		=> r in d.chemin.t.elems
+	all r : Receptacle |
+		/*last[d.chemin] != r && */
+		r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+		=> r in d.chemin.elems
 }
 
 pred go {

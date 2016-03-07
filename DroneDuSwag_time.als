@@ -1,6 +1,5 @@
 open util/integer
 open util/ordering[Temps]
-
 /***************************************
 										Let
 ***************************************/
@@ -22,21 +21,23 @@ some sig Drone {
 
 sig Temps {}
 
-some sig Receptacle {
+abstract sig PositionCible{
 	position: one Intersection,
-	distances : seq Int,
-	listeRecep : seq Receptacle,
-	contenu : Int one -> Temps
 }
 
-one sig Entrepot {
-	position: one Intersection,
+some sig Receptacle extends PositionCible{
+	listeRecep : seq Receptacle,
+	contenu : Int
+}
+
+one sig Entrepot extends PositionCible{
+	ensembleCommandes: set Commande
 }
 
 
 some sig Commande {
-	destination: Receptacle one->Temps,
-	contenu: Int one->Temps// On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
+	destination: PositionCible one -> Temps,
+	contenu: Int one->Temps // On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
 }
 
 sig Intersection {
@@ -56,7 +57,7 @@ fact DroneContraintes {
 
 // les réceptacles ont une capacité max de RCAP
 fact CapaciteReceptacle {
-	all r: Receptacle, t:Temps | r.contenu.t <= RCAP && r.contenu.t >= 0
+	all r: Receptacle | r.contenu <= RCAP
 }
 
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
@@ -85,7 +86,7 @@ fact LimitationPositions {
 	all i:Intersection | i.X <=9 && i.X >= 0 && i.Y <= 9 && i.Y >= 0
 }
 
-fact NonLuiMeme {
+fact ReceptacleNePeutPasAllerVersLuiMeme {
 	all r:Receptacle | r not in r.listeRecep.elems
 }
 
@@ -122,6 +123,7 @@ fact CommandeUnSeulDrone{
 
 fact {go}
 
+
 /***************************************
 										Pred
 ***************************************/
@@ -131,19 +133,15 @@ pred initialiser {
 		d.batterie.first = 3
 		d.position.first = Entrepot.position
 		d.commande.contenu.first = 0
+		d.commande.destination.first = Entrepot
 		d.chemin.first.isEmpty
 	}
 }
 
-pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
-	i = Entrepot.position //L'entrepôt est toujours disponible
-	||
-	all d:Drone - d'| d.position.t' != i
-}
-
 pred calculerChemin[d:Drone] {
-	all r : Receptacle | r in d.chemin.first.elems && last[d.chemin.first] != r //est pas dernier elem
-		=> r in d.chemin.first[idxOf[d.chemin.first,r]+1].listeRecep.elems
+	all r : Receptacle, t:Temps |
+		last[d.chemin.t] != r && r in d.chemin.t[idxOf[d.chemin.t,r]+1].listeRecep.elems
+		=> r in d.chemin.t.elems
 }
 
 pred go {
@@ -183,6 +181,7 @@ pred moveDrone[t,t':Temps, d:Drone]{
 
 }
 
+
 /***************************************
 										Fun
 ***************************************/
@@ -196,10 +195,11 @@ fun abs[x: Int] : Int {
 fun distance[i1,i2: Intersection]: Int {
     abs[abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]]
 }
- 
+
 /***************************************
 										Run
 ***************************************/
+
 run go for 1 Drone, exactly 2 Receptacle, 1 Commande,  4 Intersection, 7 int, 10 Temps
 
 /***************************************
@@ -219,8 +219,8 @@ assert positive {
 }*/
 
 
-
 /***************************************
 										Check
 ***************************************/
+
 check positive

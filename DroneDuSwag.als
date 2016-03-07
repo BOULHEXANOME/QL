@@ -168,7 +168,8 @@ pred go {
 	all t:Temps - last |let t'=t.next |
 	{
 		all d:Drone | bougerDrone[t,t',d]
-		all c:Commande | bougerCommande[t,t',c]
+		all c:Commande | c in Entrepot.ensembleCommandes.t => c.contenu.t'=c.contenu.t && c.destination.t'=c.destination.t
+		Entrepot.ensembleCommandes.t'=Entrepot.ensembleCommandes.t
 	}
 }
 
@@ -188,6 +189,8 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 				d.batterie.t'=d.batterie.t
 				d.position.t'=d.position.t
 				d.calculerChemin[t']
+			} else {
+
 			}
 		} /*else { // réceptacle destination
 			d.commande.destination.contenu.t' = (d.commande.destination.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
@@ -200,14 +203,7 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 		d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 		}
 	}*/
-
 }
-
-pred bougerCommande[t,t':Temps, c:Commande]{
-	c.contenu.t'=c.contenu.t
-	c.destination.t'=c.destination.t
-}
-
 
 /***************************************
 										Fun

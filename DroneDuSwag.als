@@ -183,26 +183,36 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 	
 	d.commande.contenu.t = 0 => {//Le contenu est vide
 		d.position.t = Entrepot.position => { //entrepot
-			some c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes
+			one c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes
 				d.commande.destination.t' = c.destination.t
 				d.commande.contenu.t' = c.contenu.t
 				d.batterie.t'=d.batterie.t
 				d.position.t'=d.position.t
 				d.calculerChemin[t']
 			} else {
-
+				d.commande.destination.t' = d.commande.destination.t
+				d.commande.contenu.t' = d.commande.contenu.t
+				d.batterie.t'=d.batterie.t
+				d.position.t'=d.position.t
+				d.chemin.t' = d.chemin.t
 			}
 		} /*else { // réceptacle destination
 			d.commande.destination.contenu.t' = (d.commande.destination.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
 			d.commande.ensembleProd.t.contenu = 0
 			d.position.t' = d.position.t => d.batterie.t' = d.batterie.t//immobile
 		}*/
-	}/*else{//Le drone n'est pas à destination
+	}else{//Le drone n'est pas à destination
+				d.commande.destination.t' = d.commande.destination.t
+				d.commande.contenu.t' = d.commande.contenu.t
+				d.batterie.t'=d.batterie.t
+				d.position.t'=d.position.t
+				d.chemin.t' = d.chemin.t
+/*
 		intersectionVide[t,t',d,d.chemin.first.position] => { //Si on peut bouger, on le fait
 		d.position.t' = d.chemin.first.position//on déplace le drone
 		d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
-		}
-	}*/
+*/
+	}
 }
 
 /***************************************

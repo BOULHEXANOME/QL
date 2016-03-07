@@ -121,13 +121,13 @@ fact PremierDuChemin{
 	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => (first[d.chemin.t]= r && distance[Entrepot.position, r.position] <= 3)
 }
 fact SecondDuChemin{
-	all d:Drone | some r: Receptacle | (distance[r.position, Entrepot.position] > 0 && distance[r.position, Entrepot.position] <= 3) => d.chemin[1]=r
+	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => ((distance[r.position, Entrepot.position] > 0 && distance[r.position, Entrepot.position] <= 3) => d.chemin.t[1]=r)
 }
 fact DernierDuChemin{
 	all d:Drone, t:Temps | !d.chemin.t.isEmpty => (last[d.chemin.t]= d.commande.destination.t)
 }
 fact CommandeUnSeulDrone{
-	all disj d,d2:Drone | d.commande != d2.commande
+	all disj d,d2:Drone, t:Temps | let c = d.commande | (c.destination.t != Entrepot &&c.contenu.t != 0)=>d.commande != d2.commande
 }
 
 fact {go}
@@ -147,11 +147,11 @@ pred initialiser {
 	}
 }
 
-pred calculerChemin[d:Drone] {
+pred calculerChemin[d:Drone, t:Temps] {
 	all r : Receptacle |
 		/*last[d.chemin] != r && */
-		r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
-		=> r in d.chemin.elems
+		r in d.chemin.t[idxOf[d.chemin.t,r]+1].listeRecep.elems
+		=> r in d.chemin.t.elems
 }
 
 pred go {
@@ -163,26 +163,27 @@ pred go {
 }
 
 pred moveDrone[t,t':Temps, d:Drone]{
-
-	d.batterie.t' = d.batterie.t
-	d.position.t' = d.position.t
-	d.chemin.t' = d.chemin.t
 	
 	//majBatterie
 	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
 	d.position.t' = d.position.t => d.batterie.t' = d.batterie.t else//immobile
 	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 	*/
-	/*
-	d.position.t = d.commande.destination.position => {//Le drone est a destination
+	
+	d.position.t = d.commande.destination.t.position => {//Le drone est a destination
 		d.position.t = Entrepot.position => { //entrepot destination
-			
-		} else { // réceptacle destination
+			some c:Commande | c.destination.t != Entrepot => {//il reste des commandes
+				d.commande.destination.t' = c.destination.t
+				d.commande.contenu.t' = c.contenu.t
+				d.calculerChemin[t']
+			}
+				
+		} /*else { // réceptacle destination
 			d.commande.destination.contenu.t' = (d.commande.destination.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
 			d.commande.ensembleProd.t.contenu = 0
 			d.position.t' = d.position.t => d.batterie.t' = d.batterie.t//immobile
-		}
-	}else{//Le drone n'est pas à destination
+		}*/
+	}/*else{//Le drone n'est pas à destination
 		intersectionVide[t,t',d,d.chemin.first.position] => { //Si on peut bouger, on le fait
 		d.position.t' = d.chemin.first.position//on déplace le drone
 		d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
@@ -210,7 +211,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run go for 1 Drone, exactly 2 Receptacle, 1 Commande,  4 Intersection, 7 int, 10 Temps
+run go for 1 Drone, exactly 3 Receptacle, 2 Commande,  6 Intersection, 7 int, 10 Temps
 
 /***************************************
 										Assert
@@ -224,7 +225,7 @@ assert positive {
 /*assert fin {
 	some t:Temps | all d:Drone, c:Commande | {
 		d.position.t = Entrepot.position
-		c.contenu.t = 5
+		c.contenu.t = 0
 	}
 }*/
 

@@ -109,7 +109,7 @@ fact EntrepotPasSurReceptacle {
 
 // taille de la grille
 fact LimitationPositions {
-	all i:Intersection | i.x <=9 && i.x >= 0 && i.y <=9 && i.y >= 0
+	all i:Intersection | i.x <=5 && i.x >= -5 && i.y <=5 && i.y >=-5
 }
 
 fact ReceptacleNePeutPasAllerVersLuiMeme {
@@ -159,6 +159,12 @@ fact CommandeUnSeulDrone{
 fact TestCheminPlusLong{
 	all d: Drone | # inds[d.chemin] > 3
 }
+fact testSurCheminHS{
+	all r : Receptacle| all d : Drone |
+		/*last[d.chemin] != r && */
+		r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+		=> r in d.chemin.elems
+}
 
 /***************************************
 										Pred
@@ -170,16 +176,16 @@ pred simuler {
 
 pred initialiser {
 	all d:Drone | d.batterie = 3
-	all d:Drone | calculerChemin[d]
+//	all d:Drone | calculerChemin[d]
 }
 
-pred calculerChemin[d:Drone] {
+/*pred calculerChemin[d:Drone] {
 	all r : Receptacle |
-		/*last[d.chemin] != r && */
+		last[d.chemin] != r && 
 		r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
 		=> r in d.chemin.elems
 		
-}
+}*/
 
 /***************************************
 										Fun
@@ -199,7 +205,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run initialiser for exactly 1 Drone, exactly 7 Receptacle, 1 EnsembleProduits, exactly 1 Commande, 20 Intersection, 6 int, 10 PositionCible
+run initialiser for exactly 1 Drone, exactly 6 Receptacle, 1 EnsembleProduits, exactly 1 Commande, 15 Intersection, 6 int, 17 PositionCible
 
 /***************************************
 										Assert

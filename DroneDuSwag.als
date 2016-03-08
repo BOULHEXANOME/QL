@@ -27,7 +27,7 @@ abstract sig PositionCible{
 }
 
 some sig Receptacle extends PositionCible{
-	contenu : Int
+	contenu : Int one->Temps
 }
 
 one sig Entrepot extends PositionCible{
@@ -64,7 +64,7 @@ fact CommandesPasSurReceptacle {
 
 // les réceptacles ont une capacité max de RCAP
 fact CapaciteReceptacle {
-	all r: Receptacle | r.contenu <= RCAP && r.contenu >= 0
+	all r: Receptacle, t:Temps | r.contenu.t <= RCAP && r.contenu.t >= 0
 }
 
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
@@ -154,6 +154,7 @@ pred initialiser {
 	}
 	all d:Drone, c:Commande | c.contenu.first = 0 => d.commande = c
 	all c:Commande | c.contenu.first > 0 => c in Entrepot.ensembleCommandes.first
+	all r:Receptacle | r.contenu.first = 0
 }
 
 pred calculerChemin[d:Drone, t:Temps] {
@@ -168,8 +169,8 @@ pred go {
 	all t:Temps - last |let t'=t.next |
 	{
 		all d:Drone | bougerDrone[t,t',d]
-		all c:Commande | c in Entrepot.ensembleCommandes.t => c.contenu.t'=c.contenu.t && c.destination.t'=c.destination.t
-		Entrepot.ensembleCommandes.t'=Entrepot.ensembleCommandes.t
+		/*all c:Commande | c in Entrepot.ensembleCommandes.t => c.contenu.t'=c.contenu.t && c.destination.t'=c.destination.t
+		Entrepot.ensembleCommandes.t'=Entrepot.ensembleCommandes.t*/
 	}
 }
 
@@ -187,7 +188,17 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 	*/
 	
-	d.commande.contenu.t = 0 => {//Le contenu est vide
+	// la commande du drone est vide et le drone et à l'entrepot et il reste des commandes à livrer non vide
+	some c:Commande | (c in Entrepot.ensembleCommandes.t && c.contenu.t > 0 && d.commande.contenu.t = 0 && d.position.t = Entrepot.position)
+		=> (d.commande.destination.t' = c.destination.t && d.commande.contenu.t' = c.contenu.t)
+	
+	d.commande.contenu.t !=0 => deplacerDrone[d,t,t']
+	
+	d.commande.contenu.t!=0 && d.position.t = d.commande.destination.t.position => dechargementCommande[d,t,t']
+
+	
+	
+	/*d.commande.contenu.t = 0 => {//Le contenu est vide
 		d.position.t = Entrepot.position => { //entrepot
 			one c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes
 				d.commande.destination.t' = c.destination.t
@@ -216,17 +227,30 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 				d.chemin.t' = d.chemin.t
 				d.position.t'=d.chemin.t.first.position
 				d.batterie.t' = d.batterie.t.sub[1]
-	}
+	}*/
 }
 
 pred deplacerDrone[d:Drone,t,t':Temps]{
+	
+	d.position.t' = d.chemin.t[d.chemin.t.idxOf[d.position.t]+1].position
+	d.batterie.t'=d.batterie.t.sub[1]
+	d.chemin.t' = d.chemin.t
+	d.commande.destination.t' = d.commande.destination.t
+	d.commande.contenu.t' = d.commande.contenu.t
 
-	d.position.t.X < d.chemin.t.first.position.X => { //X n'est pas aligné
-		one i:Intersection | distance[i,d.position.t] <= 3
-	}
-			
-		
+	all r:Receptacle | r.contenu.t' = r.contenu.t
+
 }
+
+pred dechargementCommande[d:Drone, t,t':Temps]{
+	d.position.t' = d.position.t
+	d.batterie.t' = d.batterie.t
+	d.chemin.t'=d.chemin.t	
+	d.commande.destination.t.contenu.t'=d.commande.destination.t.contenu.t.add[d.commande.contenu.t]
+	d.commande.contenu.t' = 0
+	d.commande.destination.t' = d.commande.destination.t
+	all r:Receptacle-d.commande.destination.t | r.contenu.t' = r.contenu.t
+}	
 
 /***************************************
 										Fun

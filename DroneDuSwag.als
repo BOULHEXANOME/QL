@@ -168,7 +168,7 @@ pred go {
 	all t:Temps - last |let t2=t.next |
 	{
 		all d:Drone | bougerDrone[t,t2,d]
-		all c:Commande | bougerCommande[t,t2,c]
+//		all c:Commande | bougerCommande[t,t2,c]
 	}
 }
 
@@ -181,8 +181,8 @@ pred bougerDrone[t,t2:Temps, d:Drone]{
 	*/
 	
 	// la commande du drone est vide et le drone et à l'entrepot et il reste des commandes à livrer non vide
-	some c:Commande | (d.commande.destination.t2 = c.destination.t)
-		=> (c in Entrepot.ensembleCommandes.t && c.contenu.t > 0 && d.commande.contenu.t = 0 && d.position.t = Entrepot.position)
+	some c:Commande | (c in Entrepot.ensembleCommandes.t && c.contenu.t > 0 && d.commande.contenu.t = 0 && d.position.t = Entrepot.position)
+		=> (d.commande.destination.t2 = c.destination.t && d.commande.contenu.t2 = c.contenu.t)
 	/*d.commande.contenu.t = 0 => {//Le contenu est vide
 		d.position.t = Entrepot.position => { //entrepot
 			one c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes

@@ -119,7 +119,7 @@ fact ReceptacleNePeutPasAllerVersLuiMeme {
 
 // Remplissage liste des receptacles accessibles
 fact ListeReceptacleAuMoins1Accessible {
-	all r1:Receptacle | some r2:Receptacle | 	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
+	all r1:Receptacle | some r2:Receptacle | r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
 }
 fact ListeReceptacleContraintesDistance{
 	no r1:Receptacle | some r3:Receptacle | (distance[r1.position, r3.position] > 3 || distance[r1.position, r3.position]<=0) &&
@@ -134,13 +134,11 @@ fact ListeReceptacleSansDoublons{
 }
 
 fact TousReceptaclesAccessibles{
-	all r1,r2: Receptacle | some chemin: seq Receptacle | some r : Receptacle |
-		/*last[chemin] != r && */last[chemin] = r1 && first[chemin] = r2  && r in chemin[idxOf[chemin,r]+1].listeRecep.elems =>
- 		r in chemin.elems
+	all r1,r2 : Receptacle | some chemin : seq Receptacle | no r3 : Receptacle | 
+		r2 != r3 && last[chemin] = r2 && first[chemin] = r1  && r3 in chemin.elems && r3  !in chemin[idxOf[chemin,r3]+1].listeRecep.elems
 }
 
 fact CheminSansDoublons{
-//	all d: Drone | ! hasDups[d.chemin]
 	all d: Drone | # elems[d.chemin] = # inds[d.chemin]
 }
 fact PremierDuChemin{
@@ -155,15 +153,9 @@ fact DernierDuChemin{
 fact CommandeUnSeulDrone{
 	all disj d,d2:Drone | d.commande != d2.commande
 }
-
-fact TestCheminPlusLong{
-	all d: Drone | # inds[d.chemin] > 3
-}
 fact testSurCheminHS{
-	all r : Receptacle| all d : Drone |
-		/*last[d.chemin] != r && */
-		r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
-		=> r in d.chemin.elems
+	all d : Drone | no r1 : Receptacle | 
+		 last[d.chemin] != r1 && r1 in d.chemin.elems && r1  !in d.chemin[idxOf[d.chemin,r1]+1].listeRecep.elems
 }
 
 /***************************************
@@ -176,14 +168,14 @@ pred simuler {
 
 pred initialiser {
 	all d:Drone | d.batterie = 3
-//	all d:Drone | calculerChemin[d]
+	//all d:Drone | calculerChemin[d]
 }
-
-/*pred calculerChemin[d:Drone] {
+/*
+pred calculerChemin[d:Drone] {
 	all r : Receptacle |
 		last[d.chemin] != r && 
 		r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
-		=> r in d.chemin.elems
+		<=> r in d.chemin.elems
 		
 }*/
 

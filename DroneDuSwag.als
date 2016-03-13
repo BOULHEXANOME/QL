@@ -90,80 +90,36 @@ fact EntrepotPasSurReceptacle {
 
 // taille de la grille
 fact LimitationPositions {
-	all i:Intersection | i.X <=9 && i.X >= 0 && i.Y <= 9 && i.Y >= 0
-}
-
-fact ReceptacleNePeutPasAllerVersLuiMeme {
-	all r:Receptacle | r not in r.listeRecep.elems
-}
-
-// Remplissage liste des receptacles accessibles
-fact ListeReceptacleAuMoins1Accessible {
-	all r1:Receptacle | some r2:Receptacle | 	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
-}
-fact ListeReceptacleContraintesDistance{
-	no r1:Receptacle | some r3:Receptacle | (distance[r1.position, r3.position] > 3 || distance[r1.position, r3.position]<=0) &&
-	r3 in elems[r1.listeRecep]
-}
-fact ListeReceptacleAjoutTousAccessibles{
-	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
-	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
-}
-fact ListeReceptacleSansDoublons{
-	all r1:Receptacle | ! hasDups[r1.listeRecep]
-}
-
-fact TousReceptaclesAccessibles{
-	all r1,r2: Receptacle | some chemin: seq Receptacle | some r : Receptacle |
-		/*last[chemin] != r && */last[chemin] = r1 && first[chemin] = r2  && r in chemin[idxOf[chemin,r]+1].listeRecep.elems =>
- 		r in chemin.elems
-}
-
-fact CheminSansDoublons{
-//	all d: Drone | ! hasDups[d.chemin]
-	all d: Drone, t:Temps | # elems[d.chemin.t] = # inds[d.chemin.t]
-}
-
-fact PremierDuChemin{
-	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => (first[d.chemin.t]= r && distance[Entrepot.position, r.position] <= 3)
-}
-fact SecondDuChemin{
-	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => ((distance[r.position, Entrepot.position] > 0 && distance[r.position, Entrepot.position] <= 3) => d.chemin.t[1]=r)
-}
-fact DernierDuChemin{
-	all d:Drone, t:Temps | !d.chemin.t.isEmpty => (last[d.chemin.t]= d.commande.destination.t)
-}
-fact CommandeUnSeulDrone{
-	all disj d,d2:Drone, t:Temps | let c = d.commande | (c.destination.t != Entrepot &&c.contenu.t != 0)=>d.commande != d2.commande
-}
 
 fact {go}
 
+fact TestCheminPlusLong{
+	all d: Drone | # inds[d.chemin] > 3
+}
+fact testSurCheminHS{
+	all r : Receptacle| all d : Drone |
+		/*last[d.chemin] != r && */
+		r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+		=> r in d.chemin.elems
+}
 
 /***************************************
 										Pred
 ***************************************/
 
 pred initialiser {
-	all d:Drone | {
-		d.batterie.first = 3
-		d.position.first = Entrepot.position
-		d.commande.contenu.first = 0
-		d.commande.destination.first = Entrepot
-		d.chemin.first.isEmpty
-	}
-	all d:Drone, c:Commande | c.contenu.first = 0 => d.commande = c
-	all c:Commande | c.contenu.first > 0 => c in Entrepot.ensembleCommandes.first
-	all r:Receptacle | r.contenu.first = 0
+
+	all d:Drone | d.batterie = 3
+//	all d:Drone | calculerChemin[d]
 }
 
-pred calculerChemin[d:Drone, t:Temps] {
+/*pred calculerChemin[d:Drone] {
 	all r : Receptacle |
-		/*last[d.chemin] != r && */
-		r in d.chemin.t[idxOf[d.chemin.t,r]+1].listeRecep.elems
-		=> r in d.chemin.t.elems
-}
-
+		last[d.chemin] != r && 
+		r in d.chemin[idxOf[d.chemin,r]+1].listeRecep.elems
+		=> r in d.chemin.elems
+		
+}*/
 pred go {
 	initialiser
 	all t:Temps - last |let t'=t.next |
@@ -270,7 +226,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
-run go for 1 Drone, exactly 2 Receptacle, exactly 2 Commande,  6 Intersection, 7 int, exactly 5 Temps
+run initialiser for exactly 1 Drone, exactly 6 Receptacle, 1 EnsembleProduits, exactly 1 Commande, 15 Intersection, 6 int, 17 PositionCible
 
 /***************************************
 										Assert

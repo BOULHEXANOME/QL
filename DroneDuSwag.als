@@ -9,6 +9,8 @@ let RCAP = 10
 
 /***************************************
 										Sig
+	Se référer au modèle conceptuel des données
+		pour plus d'informations sur les objets
 ***************************************/
 
 some sig Drone {
@@ -41,7 +43,8 @@ sig EnsembleProduits {
 
 some sig Commande {
 	destination: one PositionCible,
-	ensembleProd: lone EnsembleProduits // On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
+   // On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
+	ensembleProd: lone EnsembleProduits
 }
 
 sig Intersection {
@@ -112,53 +115,73 @@ fact LimitationPositions {
 	all i:Intersection | i.x <=5 && i.x >= -5 && i.y <=5 && i.y >=-5
 }
 
+// Un receptacle ne peut pas figurer dans sa propre liste des receptacles atteignables
 fact ReceptacleNePeutPasAllerVersLuiMeme {
 	all r:Receptacle | r not in r.listeRecep.elems
 }
 
-
-// Remplissage liste des receptacles accessibles
+// Remplissage de la liste des receptacles accessibles par un receptacle
 fact ListeReceptacleAuMoins1Accessible {
 	all r1:Receptacle | some r2:Receptacle | 	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
 }
+
+// 
 fact ListeReceptacleContraintesDistance{
 	no r1:Receptacle | some r3:Receptacle | (distance[r1.position, r3.position] > 3 || distance[r1.position, r3.position]<=0) &&
 	r3 in elems[r1.listeRecep]
 }
+
+// 
 fact ListeReceptacleAjoutTousAccessibles{
 	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
 	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
 }
+
+// Il n'y a pas deux fois le même receptacle dans la liste des receptacles atteignables
 fact ListeReceptacleSansDoublons{
 	all r1:Receptacle | ! hasDups[r1.listeRecep]
 }
 
+// Il doit exister un chemin tel qu'en partant d'un réceptacle, on puisse atteindre n'importe quel réceptacle de destination 
+// en passant par une liste de réceptacles espacés de 3 ou moins les uns des autres
 fact TousReceptaclesAccessibles{
 	all r1,r2: Receptacle | some chemin: seq Receptacle | some r : Receptacle |
 		/*last[chemin] != r && */last[chemin] = r1 && first[chemin] = r2  && r in chemin[idxOf[chemin,r]+1].listeRecep.elems =>
  		r in chemin.elems
 }
 
+// Chaque drone a un chemin qui ne comporte pas de doublons
 fact CheminSansDoublons{
 //	all d: Drone | ! hasDups[d.chemin]
 	all d: Drone | # elems[d.chemin] = # inds[d.chemin]
 }
+
+// Les drones partent de l'entrepot
 fact PremierDuChemin{
 	all d:Drone | first[d.chemin]= Entrepot
 }
+
+// La deuxieme destination du Drone (après l'entrepot) est un receptacle situé à 3 ou moins de l'entrepot
 fact SecondDuChemin{
 	all d:Drone | some r: Receptacle | (distance[r.position, Entrepot.position] > 0 && distance[r.position, Entrepot.position] <= 3) => d.chemin[1]=r
 }
+
+// Le dernier receptacle que visitera un Drone est le receptacle de destination où il livrera sa commande
 fact DernierDuChemin{
 	all d:Drone | last[d.chemin]= d.commande.destination
 }
+
+// Il n'existe pas deux drones qui aient la même commande
 fact CommandeUnSeulDrone{
 	all disj d,d2:Drone | d.commande != d2.commande
 }
 
+// 
 fact TestCheminPlusLong{
 	all d: Drone | # inds[d.chemin] > 3
 }
+
+//
 fact testSurCheminHS{
 	all r : Receptacle| all d : Drone |
 		/*last[d.chemin] != r && */
@@ -170,10 +193,12 @@ fact testSurCheminHS{
 										Pred
 ***************************************/
 
+// Sert à lancer la simulation
 pred simuler {
 	initialiser
 }
 
+// Etape d'initialisation qui regle les paramètres des Drones
 pred initialiser {
 	all d:Drone | d.batterie = 3
 //	all d:Drone | calculerChemin[d]
@@ -191,12 +216,12 @@ pred initialiser {
 										Fun
 ***************************************/
 
-// calcule la valeur absolue
+// Retourne la valeur absolue d'un entier
 fun abs[x: Int] : Int {
 	(x<0) => x.mul[-1] else (x)
 }
 
-// calcule la distance entre deux intersections
+// Calcule la distance de Manhattan entre deux intersections
 fun distance[i1,i2: Intersection]: Int {
     abs[abs[i1.x.sub[i2.x]].add[abs[i1.y.sub[i2.y]]]]
 }
@@ -205,6 +230,7 @@ fun distance[i1,i2: Intersection]: Int {
 										Run
 ***************************************/
 
+// Execute le programme
 run initialiser for exactly 1 Drone, exactly 6 Receptacle, 1 EnsembleProduits, exactly 1 Commande, 15 Intersection, 6 int, 17 PositionCible
 
 /***************************************

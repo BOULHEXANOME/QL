@@ -6,6 +6,18 @@ est défini par rapport à son précédent. L'idée est donc de considérer les 
 dépendants du temps, ce qui permet de simuler l'avancée des drones selon le chemin précalculé.
 De cette façon, nous pouvons gérer le comportement de la batterie en ce qui concerne la batterie, le chargement
 et déchargement de commande, et les collisions.
+
+FONCTIONNALITES : (SANS CHEMIN DISPONIBLE, DONC PAS TESTE !!)
+	- Déplacement des drones de réceptacles en réceptacles
+	- Batterie
+	- Chargement d'une commande
+	- Déchargement d'une commande
+
+TODO :
+	- Réparer le calcul du chemin
+	- Déplacement avec intersections
+	- Gestion des collisions
+
 ***************************************/
 open util/integer
 open util/ordering[Temps]

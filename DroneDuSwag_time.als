@@ -218,20 +218,8 @@ pred calculerChemin[d:Drone, t:Temps] {
 }
 
 
-pred intersectionVide[t,t':Temps, d:Drone, i:Intersection]{
-	
-	
-
-}
-
 //Prédicat gérant le mouvement du Drone, en fonction de la situation
 pred bougerDrone[t,t':Temps, d:Drone]{
-	
-	//majBatterie
-	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
-	d.position.t' = d.position.t => d.batterie.t' = d.batterie.t else//immobile
-	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
-	*/
 	
 	// la commande du drone est vide et le drone et à l'entrepot et il reste des commandes à livrer non vide
 	some c:Commande | (c in Entrepot.ensembleCommandes.t && c.contenu.t > 0 && d.commande.contenu.t = 0 && d.position.t = Entrepot.position)
@@ -242,43 +230,31 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 
 	//Le drone contient une commande, il est à destination : il doit décharger
 	d.commande.contenu.t!=0 && d.position.t = d.commande.destination.t.position => dechargementCommande[d,t,t']
-
-	/*d.commande.contenu.t = 0 => {//Le contenu est vide
-		d.position.t = Entrepot.position => { //entrepot
-			one c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes
-				d.commande.destination.t' = c.destination.t
-				d.commande.contenu.t' = c.contenu.t
-				d.batterie.t'=d.batterie.t
-				d.position.t'=d.position.t
-				d.calculerChemin[t']
-			} else {
-				d.commande.destination.t' = d.commande.destination.t
-				d.commande.contenu.t' = d.commande.contenu.t
-				d.batterie.t'=d.batterie.t
-				d.position.t'=d.position.t
-				d.chemin.t' = d.chemin.t
-			}
-		} else { // réceptacle destination
-				d.commande.destination.t' = d.commande.destination.t
-				d.commande.contenu.t' = d.commande.contenu.t
-				d.batterie.t'=d.batterie.t
-				d.position.t'=d.position.t
-				d.chemin.t' = d.chemin.t
-		}
-	}else{//Le drone n'est pas à destination
-				d.commande.destination.t' = d.commande.destination.t
-				d.commande.contenu.t' = d.commande.contenu.t
-				d.batterie.t'=d.batterie.t
-				d.chemin.t' = d.chemin.t
-				d.position.t'=d.chemin.t.first.position
-				d.batterie.t' = d.batterie.t.sub[1]
-	}*/
 }
 
 //Prédicat gérant le déplacement du drone 
 pred deplacerDrone[d:Drone,t,t':Temps]{
-	d.position.t' = d.chemin.t[d.chemin.t.idxOf[d.position.t]+1].position
-	d.batterie.t'=d.batterie.t.sub[1]
+	
+	d.commande.contenu.t > 0 =>{//Le drone a la commande chargée
+	//Le drone a assez de batterie
+	d.batterie.t >= d.position.t.distance[d.chemin.t[d.chemin.t.idxOf[d.position.t]+1].position] =>{
+		d.position.t' = d.chemin.t[d.chemin.t.idxOf[d.position.t]+1].position
+		d.batterie.t'=d.batterie.t.sub[1]
+	}else{//Le drone doit recharger
+		d.position.t' = d.position.t
+		d.batterie.t' = d.batterie.t.add[1]
+	}
+	}else{//le drone est en retour à l'entrepôt
+	//le drone a assez de batterie
+	d.batterie.t >= d.position.t.distance[d.chemin.t[d.chemin.t.idxOf[d.position.t]-1].position] =>{
+		d.position.t' = d.chemin.t[d.chemin.t.idxOf[d.position.t]-1].position
+		d.batterie.t'=d.batterie.t.sub[1]
+	}else{//Le drone doit recharger
+		d.position.t' = d.position.t
+		d.batterie.t' = d.batterie.t.add[1]
+	}
+	}
+
 	d.chemin.t' = d.chemin.t
 	d.commande.destination.t' = d.commande.destination.t
 	d.commande.contenu.t' = d.commande.contenu.t
@@ -322,8 +298,8 @@ run go for 1 Drone, exactly 2 Receptacle, exactly 2 Commande,  6 Intersection, 7
 
 //Assertion de fin : si cette dernière est vérifiée, alors il existe un temps où l'on retrouve la situation dite finale :
 // - Tous les Drones sont à l'entrepôts
-// - Toutes les commandes sont déchargées
-
+// - Toutes les drones sont déchargées
+// - La liste de commandes de l'entrepôt est vide
 assert fin {
 	some t:Temps |{
 		all d:Drone, c:Commande | {
@@ -339,4 +315,4 @@ assert fin {
 										Check
 ***************************************/
 
-check positive
+check fin

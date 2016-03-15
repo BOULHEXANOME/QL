@@ -120,54 +120,82 @@ fact ListeReceptacleAuMoins1Accessible {
 	all r1:Receptacle | some r2:Receptacle | 	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
 }
 
-//
+//Les réceptacles appartenant à la liste des réceptacles d'un autre accessibles sont distant de 3 ou moins avec ce dernier
 fact ListeReceptacleContraintesDistance{
 	no r1:Receptacle | some r3:Receptacle | (distance[r1.position, r3.position] > 3 || distance[r1.position, r3.position]<=0) &&
 	r3 in elems[r1.listeRecep]
 }
 
-
+//Tous les réceptacles accessibles appartiennent à la liste des réceptacles d'au moins un autre.
 fact ListeReceptacleAjoutTousAccessibles{
 	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
 	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
 }
 
-
+// Il n'y a pas deux fois le même receptacle dans la liste des receptacles atteignables
 fact ListeReceptacleSansDoublons{
 	all r1:Receptacle | ! hasDups[r1.listeRecep]
 }
 
+// Il doit exister un chemin tel qu'en partant d'un réceptacle, on puisse atteindre n'importe quel réceptacle de destination 
+// en passant par une liste de réceptacles espacés de 3 ou moins les uns des autres
 fact TousReceptaclesAccessibles{
 	all r1,r2: Receptacle | some chemin: seq Receptacle | some r : Receptacle |
 		/*last[chemin] != r && */last[chemin] = r1 && first[chemin] = r2  && r in chemin[idxOf[chemin,r]+1].listeRecep.elems =>
  		r in chemin.elems
 }
 
+// Chaque drone a un chemin qui ne comporte pas de doublons
 fact CheminSansDoublons{
 //	all d: Drone | ! hasDups[d.chemin]
 	all d: Drone, t:Temps | # elems[d.chemin.t] = # inds[d.chemin.t]
 }
 
+// Les drones partent de l'entrepot
 fact PremierDuChemin{
 	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => (first[d.chemin.t]= r && distance[Entrepot.position, r.position] <= 3)
 }
+
+// La deuxieme destination du Drone (après l'entrepot) est un receptacle situé à 3 ou moins de l'entrepot
 fact SecondDuChemin{
 	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => ((distance[r.position, Entrepot.position] > 0 && distance[r.position, Entrepot.position] <= 3) => d.chemin.t[1]=r)
 }
+
+// Le dernier receptacle que visitera un Drone est le receptacle de destination où il livrera sa commande
 fact DernierDuChemin{
 	all d:Drone, t:Temps | !d.chemin.t.isEmpty => (last[d.chemin.t]= d.commande.destination.t)
-}
+} 
+
+// Il n'existe pas deux drones qui aient la même commande
 fact CommandeUnSeulDrone{
 	all disj d,d2:Drone, t:Temps | let c = d.commande | (c.destination.t != Entrepot &&c.contenu.t != 0)=>d.commande != d2.commande
 }
 
+//Ce fait permet d'imposer l'univers pour que les prédicats de contrôle soient vérifiés en permanence.
 fact {go}
 
 
 /***************************************
 										Pred
+
+Les prédicats servent de points de contrôles pour les états : Ils vont gérer la transition des attributs
+dépendants du temps entre les états temporels, en fonction de la situation actuelle du drone.
+Le fonctionnement détaillé est expliqué dans le rapport.
+
 ***************************************/
 
+//Prédicat racine du programme, à lancer avec run pour effectuer la simulation.
+pred go {
+	initialiser
+	all t:Temps - last |let t'=t.next |
+	{
+		all d:Drone | bougerDrone[t,t',d]
+		/*all c:Commande | c in Entrepot.ensembleCommandes.t => c.contenu.t'=c.contenu.t && c.destination.t'=c.destination.t
+		Entrepot.ensembleCommandes.t'=Entrepot.ensembleCommandes.t*/
+	}
+}
+
+//Prédicat d'initialisation : Il permet de définir les attributs initiaux pour l'état temporel first.
 pred initialiser {
 	all d:Drone | {
 		d.batterie.first = 3
@@ -181,6 +209,7 @@ pred initialiser {
 	all r:Receptacle | r.contenu.first = 0
 }
 
+//Prédicat de calcul du chemin : PAS A JOUR, ET PAS FONCTIONNEL
 pred calculerChemin[d:Drone, t:Temps] {
 	all r : Receptacle |
 		/*last[d.chemin] != r && */
@@ -188,15 +217,6 @@ pred calculerChemin[d:Drone, t:Temps] {
 		=> r in d.chemin.t.elems
 }
 
-pred go {
-	initialiser
-	all t:Temps - last |let t'=t.next |
-	{
-		all d:Drone | bougerDrone[t,t',d]
-		/*all c:Commande | c in Entrepot.ensembleCommandes.t => c.contenu.t'=c.contenu.t && c.destination.t'=c.destination.t
-		Entrepot.ensembleCommandes.t'=Entrepot.ensembleCommandes.t*/
-	}
-}
 
 pred intersectionVide[t,t':Temps, d:Drone, i:Intersection]{
 	
@@ -204,6 +224,7 @@ pred intersectionVide[t,t':Temps, d:Drone, i:Intersection]{
 
 }
 
+//Prédicat gérant le mouvement du Drone, en fonction de la situation
 pred bougerDrone[t,t':Temps, d:Drone]{
 	
 	//majBatterie
@@ -216,12 +237,12 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 	some c:Commande | (c in Entrepot.ensembleCommandes.t && c.contenu.t > 0 && d.commande.contenu.t = 0 && d.position.t = Entrepot.position)
 		=> (d.commande.destination.t' = c.destination.t && d.commande.contenu.t' = c.contenu.t)
 	
-	d.commande.contenu.t !=0 => deplacerDrone[d,t,t']
-	
+	//Le drone contient une commande, il est en chemin : il doit se déplacer
+	d.commande.contenu.t !=0 && d.position.t != d.commande.destination.t.position => deplacerDrone[d,t,t']
+
+	//Le drone contient une commande, il est à destination : il doit décharger
 	d.commande.contenu.t!=0 && d.position.t = d.commande.destination.t.position => dechargementCommande[d,t,t']
 
-	
-	
 	/*d.commande.contenu.t = 0 => {//Le contenu est vide
 		d.position.t = Entrepot.position => { //entrepot
 			one c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes
@@ -254,18 +275,17 @@ pred bougerDrone[t,t':Temps, d:Drone]{
 	}*/
 }
 
+//Prédicat gérant le déplacement du drone 
 pred deplacerDrone[d:Drone,t,t':Temps]{
-	
 	d.position.t' = d.chemin.t[d.chemin.t.idxOf[d.position.t]+1].position
 	d.batterie.t'=d.batterie.t.sub[1]
 	d.chemin.t' = d.chemin.t
 	d.commande.destination.t' = d.commande.destination.t
 	d.commande.contenu.t' = d.commande.contenu.t
-
 	all r:Receptacle | r.contenu.t' = r.contenu.t
-
 }
 
+//Prédicat gérant le déchargement de la commande
 pred dechargementCommande[d:Drone, t,t':Temps]{
 	d.position.t' = d.position.t
 	d.batterie.t' = d.batterie.t
@@ -300,17 +320,19 @@ run go for 1 Drone, exactly 2 Receptacle, exactly 2 Commande,  6 Intersection, 7
 										Assert
 ***************************************/
 
-assert positive {
-	no x:Int | x.abs < 0
-	all i1:Intersection | no i2:Intersection |i1.distance[i2] < 0
-}
+//Assertion de fin : si cette dernière est vérifiée, alors il existe un temps où l'on retrouve la situation dite finale :
+// - Tous les Drones sont à l'entrepôts
+// - Toutes les commandes sont déchargées
 
-/*assert fin {
-	some t:Temps | all d:Drone, c:Commande | {
-		d.position.t = Entrepot.position
-		c.contenu.t = 0
+assert fin {
+	some t:Temps |{
+		all d:Drone, c:Commande | {
+			d.position.t = Entrepot.position
+			c.contenu.t = 0
+		}
+		no c:Commande | c in Entrepot.ensembleCommandes.t
 	}
-}*/
+}
 
 
 /***************************************

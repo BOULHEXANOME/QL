@@ -43,8 +43,7 @@ sig EnsembleProduits {
 
 some sig Commande {
 	destination: one PositionCible,
-   // On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
-	ensembleProd: lone EnsembleProduits
+	contenu: Int
 }
 
 sig Intersection {
@@ -64,7 +63,7 @@ fact BatterieDrone {
 
 // les drones ont une capacité max de DCAP
 fact CapaciteDrone {
-	all d: Drone | d.commande.ensembleProd.contenu <= DCAP && d.commande.ensembleProd.contenu > 0
+	all d: Drone | d.commande.contenu <= DCAP && d.commande.contenu > 0
 }
 
 // les réceptacles ont une capacité max de RCAP
@@ -72,20 +71,9 @@ fact CapaciteReceptacle {
 	all r: Receptacle | r.contenu <= RCAP
 }
 
-
-// Ensemble de Produits appartient à une commande
-fact EnsembleProdDansCommande {
-	all e:EnsembleProduits | some c:Commande | c.ensembleProd = e
-}
-
-// L'entrepôt a une liste de toutes les commandes
-fact EntrepotListeCommande {
-	all c:Commande | some e:Entrepot | c in e.ensembleCommandes
-}
-
 // Si la commande contient un ensemble de prod, alors elle ne peut pas être livrée à l'entrepôt
 fact PasLivraisonEntrepot {
-	all c:Commande | one c.ensembleProd => c.destination.position != Entrepot.position
+	all c:Commande | c.contenu > 0 => c.destination.position != Entrepot.position
 }
 
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot

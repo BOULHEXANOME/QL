@@ -1,6 +1,14 @@
+/***************************************
+Cette version permet de gérer la position des Drones dans le temps, à l'aide de la bibliothèque util/ordering
+appliqué au Temps.
+De cette façon, nous introduisons le temps comme une succession d'états, allant de first à last, où chaque état
+est défini par rapport à son précédent. L'idée est donc de considérer les attributs de nos signatures comme
+dépendants du temps, ce qui permet de simuler l'avancée des drones selon le chemin précalculé.
+De cette façon, nous pouvons gérer le comportement de la batterie en ce qui concerne la batterie, le chargement
+et déchargement de commande, et les collisions.
+***************************************/
 open util/integer
 open util/ordering[Temps]
-
 /***************************************
 										Let
 ***************************************/
@@ -8,39 +16,40 @@ open util/ordering[Temps]
 let DCAP = 5
 let RCAP = 10
 
-
 /***************************************
 										Sig
+
+Les signatures sont les mêmes qu'auparavant, cependant, nous faisons dépendre certains attributs du temps, afin de
+les rendres modifiables au fur et à mesure de l'avancement des états.
 ***************************************/
+
 
 some sig Drone {
 	position: Intersection one -> Temps,
-	commande: lone Commande,
+	commande: one Commande,
 	batterie: Int one->Temps,
-	chemin : seq Receptacle -> Temps
+	chemin : seq Receptacle->Temps
 }
 
 sig Temps {}
 
-some sig Receptacle {
-	position: one Intersection,
-	distances : seq Int,
+abstract sig PositionCible{
 	listeRecep : seq Receptacle,
-	contenu : Int one -> Temps
+	position: one Intersection
 }
 
-one sig Entrepot {
-	position: one Intersection,
-	ensembleCommandes: set Commande
+some sig Receptacle extends PositionCible{
+	contenu : Int one->Temps
 }
 
-sig EnsembleProduits {
-	contenu: Int
+one sig Entrepot extends PositionCible{
+	ensembleCommandes: set Commande -> Temps
 }
+
 
 some sig Commande {
-	destination: Receptacle one-> Temps,
-	ensembleProd: EnsembleProduits lone-> Temps// On permet de créer une commande pour aller à l'entrepot, sans ensembleProd pour gérer le retour du drone
+	destination: PositionCible one -> Temps,
+	contenu: Int one->Temps
 }
 
 sig Intersection {
@@ -48,16 +57,21 @@ sig Intersection {
 	Y : Int
 }
 
-
 /***************************************
 										Fact
+
+Les faits sont les mêmes que pour la première partie, à ceci près qu'ils sont réfactorés pour fonctionner
+avec l'introduction des états temporels.
 ***************************************/
 
 // la batterie du drone est entre 0 et 3
-fact DroneContraintes {
-	all d:Drone, t:Temps | d.batterie.t >= 0 && d.batterie.t <= 3 //Bornes de la batterie
-	all d: Drone, t:Temps | d.commande.ensembleProd.t.contenu <= DCAP && d.commande.ensembleProd.t.contenu > 0
-	
+fact BatterieDrone {
+	all d:Drone, t:Temps | d.batterie.t >= 0 && d.batterie.t < 4
+}
+
+// les drones ont une capacité max de DCAP
+fact CapaciteDrone {
+	all c:Commande, t:Temps | c.contenu.t<= DCAP && c.contenu.t>= 0
 }
 
 // les réceptacles ont une capacité max de RCAP
@@ -65,30 +79,15 @@ fact CapaciteReceptacle {
 	all r: Receptacle, t:Temps | r.contenu.t <= RCAP && r.contenu.t >= 0
 }
 
-
-// Ensemble de Produits appartient à une commande
-fact EnsembleProdDansCommande {
-	all e:EnsembleProduits, t:Temps | some c:Commande | c.ensembleProd.t = e
-}
-
-// L'entrepôt a une liste de toutes les commandes
-fact EntrepotListeCommande {
-	all c:Commande | some e:Entrepot | c in e.ensembleCommandes
-}
-
-// Si la commande contient un ensemble de prod, alors elle ne peut pas être livrée à l'entrepôt
+// Si la commande a un contenu positif, alors elle ne peut pas être livrée à l'entrepôt
 fact PasLivraisonEntrepot {
-	all c:Commande,t:Temps| one c.ensembleProd => c.destination.t.position != Entrepot.position
+	all c:Commande, t:Temps | c.contenu.t > 0 => c.destination.t != Entrepot
 }
 
 // Il y a au moins un receptacle sur une intersection voisine de l'entrepot
 fact EntrepotAUnVoisin {
-	some r:Receptacle | 
-	((r.position.X = Entrepot.position.X.add[1] || r.position.X = Entrepot.position.X.sub[1]) && (r.position.Y = Entrepot.position.Y))
-	||
-	((r.position.X = Entrepot.position.X) && (r.position.Y = Entrepot.position.Y.add[1] || r.position.Y = Entrepot.position.Y.sub[1]))
+	some r:Receptacle | distance[r.position, Entrepot.position] = 1
 }
-
 
 // Il n'existe pas 2 intersectiones identiques
 fact IntersectionUnitaire {
@@ -108,29 +107,61 @@ fact EntrepotPasSurReceptacle {
 
 // taille de la grille
 fact LimitationPositions {
-	all i:Intersection | i.X <=6 && i.X >= 0 && i.Y <= 6 && i.Y >= 0
+	all i:Intersection | i.X <=5 && i.X >= 0 && i.Y <= 5 && i.Y >= 0
 }
 
-fact NonLuiMeme {
+// Un receptacle ne peut pas figurer dans sa propre liste des receptacles atteignables
+fact ReceptacleNePeutPasAllerVersLuiMeme {
 	all r:Receptacle | r not in r.listeRecep.elems
 }
 
-fact ListeReceptacle {
-	all r1:Receptacle | some r2:Receptacle | distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0 =>
-	r2 in elems[r1.listeRecep]
-	all r1:Receptacle | some r2:Receptacle | distance[r1.position,r2.position] in elems[r1.distances]	
-	//r1.listeRecep = r1.listeRecep.add[r2] 
+// Remplissage liste des receptacles accessibles
+fact ListeReceptacleAuMoins1Accessible {
+	all r1:Receptacle | some r2:Receptacle | 	r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep]
 }
 
-/*
-// détermination du nombre d'instances
-fact NombreInstances {
-	#Drone <= 3
-	#Receptacle <= 3
-	#EnsembleProduits <= 3
-	#Commande <= 3
-	#Intersection <= 8
-}*/
+//
+fact ListeReceptacleContraintesDistance{
+	no r1:Receptacle | some r3:Receptacle | (distance[r1.position, r3.position] > 3 || distance[r1.position, r3.position]<=0) &&
+	r3 in elems[r1.listeRecep]
+}
+
+
+fact ListeReceptacleAjoutTousAccessibles{
+	all r1:Receptacle | all r2:Receptacle | (distance[r1.position, r2.position] < 4 && distance[r1.position, r2.position]>0) =>
+	(r2 in elems[r1.listeRecep] && r1 in elems[r2.listeRecep])
+}
+
+
+fact ListeReceptacleSansDoublons{
+	all r1:Receptacle | ! hasDups[r1.listeRecep]
+}
+
+fact TousReceptaclesAccessibles{
+	all r1,r2: Receptacle | some chemin: seq Receptacle | some r : Receptacle |
+		/*last[chemin] != r && */last[chemin] = r1 && first[chemin] = r2  && r in chemin[idxOf[chemin,r]+1].listeRecep.elems =>
+ 		r in chemin.elems
+}
+
+fact CheminSansDoublons{
+//	all d: Drone | ! hasDups[d.chemin]
+	all d: Drone, t:Temps | # elems[d.chemin.t] = # inds[d.chemin.t]
+}
+
+fact PremierDuChemin{
+	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => (first[d.chemin.t]= r && distance[Entrepot.position, r.position] <= 3)
+}
+fact SecondDuChemin{
+	all d:Drone, t:Temps | some r: Receptacle | !d.chemin.t.isEmpty => ((distance[r.position, Entrepot.position] > 0 && distance[r.position, Entrepot.position] <= 3) => d.chemin.t[1]=r)
+}
+fact DernierDuChemin{
+	all d:Drone, t:Temps | !d.chemin.t.isEmpty => (last[d.chemin.t]= d.commande.destination.t)
+}
+fact CommandeUnSeulDrone{
+	all disj d,d2:Drone, t:Temps | let c = d.commande | (c.destination.t != Entrepot &&c.contenu.t != 0)=>d.commande != d2.commande
+}
+
+fact {go}
 
 
 /***************************************
@@ -138,60 +169,112 @@ fact NombreInstances {
 ***************************************/
 
 pred initialiser {
-	all d:Drone | d.batterie.first = 3
-	all d:Drone | d.position.first = Entrepot.position
-	all c:Commande | c.destination.first.position = Entrepot.position
-	
-	all c:Commande | c.ensembleProd.first.contenu > 0
-	all d:Drone | no r:seq Receptacle |d.chemin.first = r
-
-	
-	
+	all d:Drone | {
+		d.batterie.first = 3
+		d.position.first = Entrepot.position
+		d.commande.contenu.first = 0
+		d.commande.destination.first = Entrepot
+		d.chemin.first.isEmpty
+	}
+	all d:Drone, c:Commande | c.contenu.first = 0 => d.commande = c
+	all c:Commande | c.contenu.first > 0 => c in Entrepot.ensembleCommandes.first
+	all r:Receptacle | r.contenu.first = 0
 }
 
-pred remplirListeReceptaclesAccessibles {
-}
-
-pred intersectionVide[t,t':Temps, d':Drone, i:Intersection] {
-	i = Entrepot.position //L'entrepôt est toujours disponible
-	||
-	all d:Drone - d'| d.position.t' != i
+pred calculerChemin[d:Drone, t:Temps] {
+	all r : Receptacle |
+		/*last[d.chemin] != r && */
+		r in d.chemin.t[idxOf[d.chemin.t,r]+1].listeRecep.elems
+		=> r in d.chemin.t.elems
 }
 
 pred go {
-
 	initialiser
 	all t:Temps - last |let t'=t.next |
 	{
-		all d:Drone | moveDrone[t,t',d]
+		all d:Drone | bougerDrone[t,t',d]
+		/*all c:Commande | c in Entrepot.ensembleCommandes.t => c.contenu.t'=c.contenu.t && c.destination.t'=c.destination.t
+		Entrepot.ensembleCommandes.t'=Entrepot.ensembleCommandes.t*/
 	}
 }
 
-pred moveDrone[t,t':Temps, d:Drone]{
+pred intersectionVide[t,t':Temps, d:Drone, i:Intersection]{
+	
+	
 
+}
+
+pred bougerDrone[t,t':Temps, d:Drone]{
+	
 	//majBatterie
 	/*d.position.t' = d.position.t && some r:Receptacle | d.position.t = r.position => d.batterie.t' = d.batterie.t.add[1] else
 	d.position.t' = d.position.t => d.batterie.t' = d.batterie.t else//immobile
 	d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
 	*/
 	
-	d.position.t = d.commande.destination.t.position => {//Le drone est a destination
+	// la commande du drone est vide et le drone et à l'entrepot et il reste des commandes à livrer non vide
+	some c:Commande | (c in Entrepot.ensembleCommandes.t && c.contenu.t > 0 && d.commande.contenu.t = 0 && d.position.t = Entrepot.position)
+		=> (d.commande.destination.t' = c.destination.t && d.commande.contenu.t' = c.contenu.t)
+	
+	d.commande.contenu.t !=0 => deplacerDrone[d,t,t']
+	
+	d.commande.contenu.t!=0 && d.position.t = d.commande.destination.t.position => dechargementCommande[d,t,t']
 
-
-		d.position.t = Entrepot.position => { //entrepot destination
-			
+	
+	
+	/*d.commande.contenu.t = 0 => {//Le contenu est vide
+		d.position.t = Entrepot.position => { //entrepot
+			one c:Commande | c in Entrepot.ensembleCommandes.t => {//il reste des commandes
+				d.commande.destination.t' = c.destination.t
+				d.commande.contenu.t' = c.contenu.t
+				d.batterie.t'=d.batterie.t
+				d.position.t'=d.position.t
+				d.calculerChemin[t']
+			} else {
+				d.commande.destination.t' = d.commande.destination.t
+				d.commande.contenu.t' = d.commande.contenu.t
+				d.batterie.t'=d.batterie.t
+				d.position.t'=d.position.t
+				d.chemin.t' = d.chemin.t
+			}
 		} else { // réceptacle destination
-			d.commande.destination.t.contenu.t' = (d.commande.destination.t.contenu.t+d.commande.ensembleProd.t)//Le réceptacle change sa capacité
-			d.commande.ensembleProd.t.contenu = 0
-			d.commande.destination.t'.position = Entrepot.position
+				d.commande.destination.t' = d.commande.destination.t
+				d.commande.contenu.t' = d.commande.contenu.t
+				d.batterie.t'=d.batterie.t
+				d.position.t'=d.position.t
+				d.chemin.t' = d.chemin.t
 		}
 	}else{//Le drone n'est pas à destination
-			intersectionVide[t,t',d,d.chemin.t.first.position] => { //Si on peut bouger, on le fait
-			d.position.t' = d.chemin.t.first.position//on déplace le drone
-			d.position.t' != d.position.t => d.batterie.t' = d.batterie.t.sub[1] //mouvement
-		}
-	}
+				d.commande.destination.t' = d.commande.destination.t
+				d.commande.contenu.t' = d.commande.contenu.t
+				d.batterie.t'=d.batterie.t
+				d.chemin.t' = d.chemin.t
+				d.position.t'=d.chemin.t.first.position
+				d.batterie.t' = d.batterie.t.sub[1]
+	}*/
 }
+
+pred deplacerDrone[d:Drone,t,t':Temps]{
+	
+	d.position.t' = d.chemin.t[d.chemin.t.idxOf[d.position.t]+1].position
+	d.batterie.t'=d.batterie.t.sub[1]
+	d.chemin.t' = d.chemin.t
+	d.commande.destination.t' = d.commande.destination.t
+	d.commande.contenu.t' = d.commande.contenu.t
+
+	all r:Receptacle | r.contenu.t' = r.contenu.t
+
+}
+
+pred dechargementCommande[d:Drone, t,t':Temps]{
+	d.position.t' = d.position.t
+	d.batterie.t' = d.batterie.t
+	d.chemin.t'=d.chemin.t	
+	d.commande.destination.t.contenu.t'=d.commande.destination.t.contenu.t.add[d.commande.contenu.t]
+	d.commande.contenu.t' = 0
+	d.commande.destination.t' = d.commande.destination.t
+	all r:Receptacle-d.commande.destination.t | r.contenu.t' = r.contenu.t
+}	
 
 /***************************************
 										Fun
@@ -204,15 +287,14 @@ fun abs[x: Int] : Int {
 
 // calcule la distance entre deux intersections
 fun distance[i1,i2: Intersection]: Int {
-//    abs[abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]]
-	i1.X.sub[i2.X].add[i1.Y.sub[i2.Y]]
+    abs[abs[i1.X.sub[i2.X]].add[abs[i1.Y.sub[i2.Y]]]]
 }
- 
+
 /***************************************
 										Run
 ***************************************/
 
-check fin for 1 Drone, exactly 1 Receptacle, 1 EnsembleProduits, 1 Commande, 2 Intersection, 6 int, 10 Temps
+run go for 1 Drone, exactly 2 Receptacle, exactly 2 Commande,  6 Intersection, 7 int, exactly 5 Temps
 
 /***************************************
 										Assert
@@ -223,17 +305,16 @@ assert positive {
 	all i1:Intersection | no i2:Intersection |i1.distance[i2] < 0
 }
 
-assert fin {
-	some t:Temps | all d:Drone | {
+/*assert fin {
+	some t:Temps | all d:Drone, c:Commande | {
 		d.position.t = Entrepot.position
-		d.commande.destination.t.position = Entrepot.position
+		c.contenu.t = 0
 	}
-}
-
+}*/
 
 
 /***************************************
 										Check
 ***************************************/
-check positive
 
+check positive
